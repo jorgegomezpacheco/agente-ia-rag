@@ -15,8 +15,10 @@
 - [Demo / URL pública](#-demo--url-pública)
 - [Arquitectura](#-arquitectura)
 - [Tecnologías utilizadas](#-tecnologías-utilizadas)
+- [Código fuente](#-código-fuente)
 - [Base de conocimiento](#-base-de-conocimiento)
-- [Instalación y despliegue](#-instalación-y-despliegue)
+- [Instrucciones de implementación desde cero](#-instrucciones-de-implementación-desde-cero)
+- [Ejecución local / mantenimiento](#-ejecución-local--mantenimiento)
 - [Ejemplos de preguntas y respuestas](#-ejemplos-de-preguntas-y-respuestas)
 - [Evidencia del despliegue](#-evidencia-del-despliegue)
 - [Estructura del repositorio](#-estructura-del-repositorio)
@@ -37,7 +39,7 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 ## 🌐 Demo / URL pública
 
 - **Chat del agente (n8n en OCI):** `[PENDIENTE: URL pública del Chat Trigger]`
-- **Repositorio GitHub:** `[PENDIENTE: URL de este repo]`
+- **Repositorio GitHub:** https://github.com/jorgegomezpacheco/agente-ia-rag
 
 ---
 
@@ -75,14 +77,30 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 
 ## 🛠 Tecnologías utilizadas
 
-| Tecnología | Rol en el proyecto |
-|---|---|
-| **n8n** (self-hosted) | Orquestador del agente: workflows visuales, Chat Trigger, AI Agent |
-| **Ollama** | Modelo de lenguaje (LLM) local, gratuito, sin límites de uso, corre en la misma VM |
-| **Oracle Cloud Infrastructure (OCI)** | Infraestructura del proyecto — VM Always Free (cómputo) |
-| **Oracle Autonomous Database 23ai** | Base de datos vectorial — almacena los embeddings de la documentación |
-| **Docker / Docker Compose** | Contenerización de n8n y Ollama en la VM |
-| `[PENDIENTE: Redis, si se implementa]` | Memoria persistente de conversación con expiración por inactividad |
+| Tecnología | Rol en el proyecto | Costo |
+|---|---|---|
+| **n8n** (self-hosted) | Orquestador del agente: workflows visuales, Chat Trigger, AI Agent | Gratis (self-hosted) |
+| **Ollama** | Modelo de lenguaje (LLM) local, corre en la misma VM, sin límites de uso ni créditos | Gratis |
+| **Oracle Cloud Infrastructure (OCI)** | Infraestructura del proyecto — VM Always Free (cómputo) | Gratis (Always Free) |
+| **Oracle Autonomous Database 23ai** | Base de datos vectorial — almacena los embeddings de la documentación | Gratis (Always Free) |
+| **Docker / Docker Compose** | Contenerización de n8n y Ollama en la VM | Gratis |
+| `[PENDIENTE: Redis, si se implementa]` | Memoria persistente de conversación con expiración por inactividad | Gratis |
+
+---
+
+## 💻 Código fuente
+
+Todo el código y la configuración del proyecto están versionados en este repositorio. No es una aplicación tradicional con líneas de código de programación general, sino una combinación de **infraestructura como código** (Docker) y **workflows visuales exportables** (n8n), de la siguiente manera:
+
+| Archivo | Qué contiene | Lenguaje/Formato |
+|---|---|---|
+| [`docker/docker-compose.yml`](./docker/docker-compose.yml) | Definición de los servicios que corren en la VM (n8n y Ollama), puertos, volúmenes y variables de entorno | YAML |
+| [`docker/.env.example`](./docker/.env.example) | Plantilla de variables de entorno necesarias (dominio, credenciales) | ENV |
+| [`workflows/agente-rag.json`](./workflows/agente-rag.json) | Workflow principal: Chat Trigger + AI Agent + conexiones a Ollama, Memory y Vector Store | JSON (exportado de n8n) |
+| [`workflows/carga-documentos.json`](./workflows/carga-documentos.json) | Workflow auxiliar que lee los documentos de `/docs`, los divide en fragmentos, genera embeddings y los guarda en el Vector Store | JSON (exportado de n8n) |
+| [`docs/documentacion-empresa/`](./docs/documentacion-empresa) | Documentos fuente (base de conocimiento) que el agente utiliza para responder | PDF / Markdown / TXT |
+
+> 💡 Los workflows de n8n son "código visual": cada nodo equivale a un bloque de lógica. El archivo `.json` exportado contiene toda esa lógica en formato texto, por lo que **sí es código versionable y revisable**, aunque no se escriba línea por línea como Python o JavaScript.
 
 ---
 
@@ -94,44 +112,122 @@ Los documentos fuente se encuentran en [`/docs/documentacion-empresa`](./docs/do
 
 ---
 
-## ⚙️ Instalación y despliegue
+## 🚀 Instrucciones de implementación desde cero
+
+Esta sección permite que **cualquier persona, sin conocer el proyecto previamente**, pueda replicar la implementación completa: desde crear la infraestructura en la nube hasta tener el agente respondiendo por una URL pública.
 
 ### Requisitos previos
-- Cuenta Oracle Cloud (Always Free)
-- Docker y Docker Compose instalados en la VM
-- Dominio propio (o DDNS gratuito) para HTTPS
 
-### Pasos
+- Cuenta en [Oracle Cloud Infrastructure](https://www.oracle.com/cloud/free/) (nivel Always Free, sin costo)
+- Un dominio propio o un servicio DNS dinámico gratuito (ej. [DuckDNS](https://www.duckdns.org/)) para tener HTTPS
+- Cuenta de GitHub (para clonar este repositorio)
+- Conocimientos básicos de terminal/línea de comandos
+
+### Paso 1 — Crear la VM en Oracle Cloud
+
+1. Ingresa a la [consola de OCI](https://cloud.oracle.com/) → **Compute → Instances → Create Instance**.
+2. Selecciona la imagen **Ubuntu** (versión LTS más reciente disponible).
+3. En **Shape**, elige **VM.Standard.A1.Flex** (Ampere ARM, incluida en Always Free) — asigna 2 OCPU / 12 GB RAM.
+4. En **Networking**, asegúrate de que se asigne una **IP pública**.
+5. Genera o sube un par de llaves SSH (guarda la llave privada, la necesitarás para conectarte).
+6. Crea la instancia y espera a que su estado sea "Running".
+
+### Paso 2 — Abrir los puertos necesarios (Security List)
+
+En la consola de OCI, ve a la **VCN** de tu instancia → **Security Lists** → agrega reglas de ingreso (Ingress Rules) para permitir tráfico en los puertos:
+- `22` (SSH)
+- `80` y `443` (HTTP/HTTPS)
+- `5678` (n8n)
+
+### Paso 3 — Conectarte a la VM por SSH
 
 ```bash
-# 1. Clonar este repositorio en la VM
-git clone [PENDIENTE: URL del repo]
-cd agente-ia-rag
-
-# 2. Levantar los servicios con Docker Compose
-docker compose -f docker/docker-compose.yml up -d
-
-# 3. Descargar el modelo de Ollama a utilizar
-docker exec -it ollama ollama pull llama3.2:3b
-
-# 4. Acceder a n8n
-# https://tu-dominio-o-ip:5678
-
-# 5. Importar el workflow del agente
-# Settings → Import from File → workflows/agente-rag.json
-
-# 6. Configurar credenciales en n8n
-#    - Ollama (Base URL: http://ollama:11434)
-#    - Oracle Database (usar wallet de conexión, ver /docker/oracle-wallet)
-
-# 7. Ejecutar una vez el workflow de carga de documentos
-#    (vectoriza los archivos de /docs/documentacion-empresa)
-
-# 8. Activar (Publish) el workflow del agente
-#    Copiar la Chat URL pública generada
+ssh -i /ruta/a/tu-llave-privada.key ubuntu@IP_PUBLICA_DE_TU_VM
 ```
 
-`[PENDIENTE: completar/ajustar estos pasos según la configuración final real]`
+### Paso 4 — Instalar Docker y Docker Compose
+
+```bash
+sudo apt update
+sudo apt install -y docker.io docker-compose-plugin
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo usermod -aG docker $USER
+```
+(Cierra sesión SSH y vuelve a entrar para que el cambio de grupo tenga efecto.)
+
+### Paso 5 — Clonar este repositorio en la VM
+
+```bash
+git clone https://github.com/jorgegomezpacheco/agente-ia-rag.git
+cd agente-ia-rag/docker
+```
+
+### Paso 6 — Configurar las variables de entorno
+
+```bash
+cp .env.example .env
+nano .env
+```
+Completa `N8N_HOST` con tu dominio o IP pública.
+
+### Paso 7 — Levantar los servicios
+
+```bash
+docker compose up -d
+```
+
+Verifica que ambos contenedores estén corriendo:
+```bash
+docker ps
+```
+
+### Paso 8 — Descargar el modelo de IA en Ollama
+
+```bash
+docker exec -it ollama ollama pull llama3.2:3b
+```
+
+### Paso 9 — Configurar HTTPS (obligatorio para el chat público)
+
+`[PENDIENTE: detallar configuración de Caddy/Traefik/Nginx + certificado SSL una vez implementado]`
+
+### Paso 10 — Acceder a n8n y configurar el agente
+
+1. Abre `https://TU_DOMINIO_O_IP:5678` en el navegador.
+2. Crea tu cuenta de administrador de n8n (primera vez).
+3. Ve a **Workflows → Import from File** e importa `workflows/carga-documentos.json` y `workflows/agente-rag.json` (disponibles en este repositorio).
+4. Configura las credenciales necesarias:
+   - **Ollama**: Base URL `http://ollama:11434`
+   - **Oracle Database** (Vector Store): usar los datos de conexión del Autonomous Database — `[PENDIENTE: detallar pasos exactos]`
+5. Ejecuta manualmente el workflow `carga-documentos.json` **una sola vez** para vectorizar los archivos de `/docs/documentacion-empresa`.
+6. Abre el workflow `agente-rag.json`, activa la opción **"Make Chat Publicly Available"** en el nodo Chat Trigger.
+7. Haz clic en **Publish/Active** para dejar el workflow corriendo de forma permanente.
+8. Copia la **Chat URL** generada — esa es la URL pública del agente.
+
+---
+
+## 🔧 Ejecución local / mantenimiento
+
+Comandos útiles para administrar el proyecto una vez desplegado:
+
+```bash
+# Ver logs de n8n
+docker logs -f n8n
+
+# Ver logs de Ollama
+docker logs -f ollama
+
+# Reiniciar los servicios
+docker compose restart
+
+# Detener todo
+docker compose down
+
+# Actualizar a la última versión de las imágenes
+docker compose pull
+docker compose up -d
+```
 
 ---
 
@@ -147,10 +243,14 @@ docker exec -it ollama ollama pull llama3.2:3b
 
 ## 📸 Evidencia del despliegue
 
-`[PENDIENTE: capturas de pantalla del agente respondiendo en producción, de la VM corriendo en OCI, del workflow en n8n, etc. — se agregarán en /screenshots]`
+`[PENDIENTE: capturas de pantalla del agente respondiendo en producción, de la VM corriendo en OCI, del workflow en n8n, etc.]`
 
-![Agente funcionando](./screenshots/agente-funcionando.png)
-![Deploy en OCI](./screenshots/deploy-oci.png)
+| Evidencia | Captura |
+|---|---|
+| VM corriendo en OCI | `[PENDIENTE]` ![VM en OCI](./screenshots/vm-oci-creada.png) |
+| Contenedores activos (`docker ps`) | `[PENDIENTE]` ![Contenedores activos](./screenshots/docker-ps.png) |
+| Workflow del agente en n8n | `[PENDIENTE]` ![Workflow n8n](./screenshots/workflow-agente.png) |
+| Chat del agente respondiendo | `[PENDIENTE]` ![Agente funcionando](./screenshots/agente-funcionando.png) |
 
 ---
 
@@ -160,7 +260,8 @@ docker exec -it ollama ollama pull llama3.2:3b
 agente-ia-rag/
 ├── README.md                          # Este archivo
 ├── docker/
-│   └── docker-compose.yml             # Definición de servicios (n8n, Ollama)
+│   ├── docker-compose.yml             # Definición de servicios (n8n, Ollama)
+│   └── .env.example                   # Plantilla de variables de entorno
 ├── workflows/
 │   ├── agente-rag.json                # Workflow principal del agente (export de n8n)
 │   └── carga-documentos.json          # Workflow de carga/vectorización de documentos
@@ -175,7 +276,8 @@ agente-ia-rag/
 
 Este proyecto se desarrolló de forma incremental, documentado a través de los commits de este repositorio. Resumen de hitos:
 
-- [ ] Definición de arquitectura y stack tecnológico
+- [x] Definición de arquitectura y stack tecnológico
+- [x] Estructura inicial del repositorio en GitHub
 - [ ] Aprovisionamiento de VM en OCI (Always Free)
 - [ ] Despliegue de n8n + Ollama vía Docker Compose
 - [ ] Creación de Oracle Autonomous Database (vector store)
@@ -190,4 +292,4 @@ Este proyecto se desarrolló de forma incremental, documentado a través de los 
 
 ## 👤 Autor
 
-**Jorge Gómez** — Proyecto desarrollado como parte de un challenge de implementación de agentes de IA con RAG.
+**Jorge Gómez Pacheco** — Proyecto desarrollado como parte de un challenge de implementación de agentes de IA con RAG.
