@@ -1,0 +1,19 @@
+# Credenciales y secretos - NUNCA subir esto a GitHub
+.env
+*.env
+docker/oracle-wallet/
+*wallet*.zip
+*.pem
+*.key
+
+# Datos de contenedores
+ollama_data/
+n8n_data/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
