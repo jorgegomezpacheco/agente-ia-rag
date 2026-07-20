@@ -1,0 +1,312 @@
+{
+  "name": "Carga de Documentos - BimBam Buy",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -544,
+        -64
+      ],
+      "id": "a5a3bc42-5b8b-4fcc-b061-f5dbd5a78401",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"documentos\": [\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/politica-reembolsos-devoluciones.pdf\",\n      \"doc_id\": \"politica-reembolsos-devoluciones\",\n      \"categoria\": \"reembolsos-devoluciones\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/programa-afiliados.pdf\",\n      \"doc_id\": \"programa-afiliados\",\n      \"categoria\": \"afiliados\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/guia-tiempos-costos-envio.pdf\",\n      \"doc_id\": \"guia-tiempos-costos-envio\",\n      \"categoria\": \"envios\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/faq-metodos-pago.pdf\",\n      \"doc_id\": \"faq-metodos-pago\",\n      \"categoria\": \"pagos\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/manual-garantia-productos.pdf\",\n      \"doc_id\": \"manual-garantia-productos\",\n      \"categoria\": \"garantias\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -368,
+        -64
+      ],
+      "id": "d518ff2d-5083-40e3-a4fe-039ed9a6d23c",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "documentos",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        -64
+      ],
+      "id": "1c1c360b-6c5c-40d6-812c-a79c1e40339b",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -16,
+        -64
+      ],
+      "id": "5b484e76-5b7a-4001-a587-5c8e96298f64",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        176,
+        16
+      ],
+      "id": "4bb645e6-e783-4fd8-8084-e04b94f38eb0",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "loader": "pdfLoader",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "=doc_id",
+                "value": "={{ $json.doc_id }}"
+              },
+              {
+                "name": "categoria",
+                "value": "={{ $json.categoria }}"
+              },
+              {
+                "name": "source",
+                "value": "={{ $json.url }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        736,
+        192
+      ],
+      "id": "8a87b3fa-b5d9-4350-be4d-a3eb2b2e66fd",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "agente-ia-rag",
+          "mode": "list",
+          "cachedResultName": "agente-ia-rag"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        608,
+        -16
+      ],
+      "id": "6b943c0e-36e4-4f71-87e3-3cafece66032",
+      "name": "Pinecone Vector Store",
+      "credentials": {
+        "pineconeApi": {
+          "id": "YvtstHVW5fOXXNWd",
+          "name": "Pinecone account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "embed-multilingual-v3.0"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        592,
+        208
+      ],
+      "id": "311968a2-7403-4cb5-946a-857d961f1dd0",
+      "name": "Embeddings Cohere",
+      "credentials": {
+        "cohereApi": {
+          "id": "bsfRiLt8qj3wFq6L",
+          "name": "Cohere account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chunkSize": 800,
+        "chunkOverlap": 150,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        848,
+        320
+      ],
+      "id": "c07b38b5-979e-452e-b581-a6e08a42b3d0",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  item.binary.data.mimeType = 'application/pdf';\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        -48
+      ],
+      "id": "387a6b78-55e1-4118-b573-8bf81d06b18b",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Cohere": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1785e5c9-484a-4bf9-88fe-d14d4864a4fa",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "964d10f68004bc72323e7156e4be9395db4db6821c043b67f0e2d34d0e1a656f"
+  },
+  "nodeGroups": [],
+  "id": "evYZc2VzmYMOUi9f",
+  "tags": []
+}
