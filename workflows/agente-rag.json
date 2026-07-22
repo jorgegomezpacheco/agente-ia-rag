@@ -1,0 +1,706 @@
+{
+  "name": "Agente RAG - BimBam Buy",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -1712,
+        -3184
+      ],
+      "id": "016b604f-7d6a-49d4-a3fe-151d49311051",
+      "name": "When chat message received",
+      "webhookId": "fb37ceff-460b-42cd-8384-955de7177aea"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Historial reciente de la conversación (puede estar vacío si es la primera pregunta): {{ $json.messages.map(m => (m.human ? 'Usuario: ' + m.human + '\\n' : '') + (m.ai ? 'Asistente: ' + (typeof m.ai === 'string' ? m.ai : JSON.stringify(m.ai)) : '')).join('\\n') }}\n\nPregunta actual del usuario: {{ $('When chat message received').item.json.chatInput }}\n\nAnaliza si la PREGUNTA ACTUAL, considerando el historial reciente si aporta contexto,\nestá relacionada con alguno de estos 5 temas de BimBam Buy: reembolsos y devoluciones,\nprograma de afiliados, envíos, métodos de pago, o garantías de productos.\n\nImportante: si la pregunta actual es sobre un tema completamente distinto\n(por ejemplo deportes, clima, cultura general), responde \"NO\" aunque el\nhistorial reciente sea sobre BimBam Buy — no asumas que toda la sesión\ncompleta es válida solo porque empezó siendo relevante.\n\nResponde ÚNICAMENTE con la palabra \"SI\" o \"NO\", sin explicación adicional.\n",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1168,
+        -3184
+      ],
+      "id": "768b7a40-3081-4cd3-93a2-5ba8f522b21b",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "gpt-oss:20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -1264,
+        -2992
+      ],
+      "id": "594b68a7-ce08-41a7-87e6-fc36d351cb57",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "lIFoyEqcjOB81VHg",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d679fc87-50e1-4775-8c2e-985176f2dc8b",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "SI",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -864,
+        -3184
+      ],
+      "id": "82849175-e9db-41a8-b51b-c3d747799887",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('When chat message received').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "Eres el asistente virtual oficial de BimBam Buy, un e-commerce\nmultiplataforma. Tu única función es responder preguntas de clientes\nusando EXCLUSIVAMENTE la información que obtengas de tus herramientas\n(reembolsos, afiliados, envíos, pagos, garantías).\n\nReglas estrictas:\n- Nunca inventes información que no esté en los resultados de tus herramientas.\n- Si no encuentras información relevante en ninguna herramienta, indica\n  que no cuentas con esa información y sugiere contactar a soporte humano.\n- Sé claro, breve y amable en tus respuestas.\n- Si la pregunta abarca más de un tema, usa varias herramientas si es necesario.\n\nFormato de tus respuestas:\n- Usa Markdown estándar (negritas con **texto**, listas con guiones -).\n- NO uses etiquetas HTML como <br>.\n- NO utilices etiquetas  como <br> en tus respuestas al usuario/cliente.\n- NO escribas el texto \"\\n\" literalmente; usa saltos de línea reales.\n- Mantén las respuestas organizadas pero conversacionales, no como tablas complejas."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -352,
+        -3200
+      ],
+      "id": "6da98f8f-c665-4cec-ad26-fa4aac662109",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "gpt-oss:20b",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        -2944
+      ],
+      "id": "8dc62b0c-bf12-4e01-81ca-c65ca728748f",
+      "name": "Ollama Chat Model1",
+      "credentials": {
+        "ollamaApi": {
+          "id": "lIFoyEqcjOB81VHg",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('When chat message received').item.json.sessionId }}",
+        "sessionTTL": 2400,
+        "contextWindowLength": 18
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+      "typeVersion": 1.6,
+      "position": [
+        -336,
+        -2944
+      ],
+      "id": "ae52dbaf-dad6-413a-9c8f-9b51890e750d",
+      "name": "Redis Chat Memory",
+      "credentials": {
+        "redis": {
+          "id": "Hz1hzC4Hx4mKtB3L",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "embed-multilingual-v3.0"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        -2928
+      ],
+      "id": "5532f274-8905-44e2-8bbe-415977e13182",
+      "name": "Embeddings Cohere",
+      "credentials": {
+        "cohereApi": {
+          "id": "bsfRiLt8qj3wFq6L",
+          "name": "Cohere account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Usa esta herramienta cuando el usuario pregunte sobre reembolsos, devoluciones, cómo devolver un pedido, plazos para el dinero de vuelta, o condiciones para reembolsos y devoluciones.",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "agente-ia-rag",
+          "mode": "list",
+          "cachedResultName": "agente-ia-rag"
+        },
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "categoria",
+                "value": "reembolsos-devoluciones"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        976,
+        -3072
+      ],
+      "id": "54530f5f-d187-487b-aec6-f4390ce69db0",
+      "name": "buscar_reembolsos",
+      "credentials": {
+        "pineconeApi": {
+          "id": "YvtstHVW5fOXXNWd",
+          "name": "Pinecone account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "embed-multilingual-v3.0"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        800,
+        -2880
+      ],
+      "id": "635feea4-ba59-4392-9624-38d0bed0a922",
+      "name": "Embeddings Cohere1",
+      "credentials": {
+        "cohereApi": {
+          "id": "bsfRiLt8qj3wFq6L",
+          "name": "Cohere account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Usa esta herramienta cuando el usuario pregunte sobre el programa de afiliados, cómo unirse, comisiones o beneficios.",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "agente-ia-rag",
+          "mode": "list",
+          "cachedResultName": "agente-ia-rag"
+        },
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "categoria",
+                "value": "afiliados"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        656,
+        -3024
+      ],
+      "id": "ba4d985d-079f-4682-aa8e-dafc8d894d10",
+      "name": "buscar_afiliados",
+      "credentials": {
+        "pineconeApi": {
+          "id": "YvtstHVW5fOXXNWd",
+          "name": "Pinecone account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "embed-multilingual-v3.0"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        496,
+        -2864
+      ],
+      "id": "d8a0bd11-e620-4de2-a748-908eb80ff5d2",
+      "name": "Embeddings Cohere2",
+      "credentials": {
+        "cohereApi": {
+          "id": "bsfRiLt8qj3wFq6L",
+          "name": "Cohere account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Usa esta herramienta cuando el usuario pregunte sobre tiempos de entrega, pregunte acerca de envío o envíos,  costos de envío o cobertura.",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "agente-ia-rag",
+          "mode": "list",
+          "cachedResultName": "agente-ia-rag"
+        },
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "categoria",
+                "value": "envios"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        368,
+        -2992
+      ],
+      "id": "d7d503ff-88e2-42e6-badb-103e932ad996",
+      "name": "buscar_envios",
+      "credentials": {
+        "pineconeApi": {
+          "id": "YvtstHVW5fOXXNWd",
+          "name": "Pinecone account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "embed-multilingual-v3.0"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        240,
+        -2848
+      ],
+      "id": "c7e48fff-5be9-48b9-9725-735ba82e88de",
+      "name": "Embeddings Cohere3",
+      "credentials": {
+        "cohereApi": {
+          "id": "bsfRiLt8qj3wFq6L",
+          "name": "Cohere account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Usa esta herramienta cuando el usuario pregunte sobre métodos de pago aceptados o problemas al pagar, o condiciones de pago.",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "agente-ia-rag",
+          "mode": "list",
+          "cachedResultName": "agente-ia-rag"
+        },
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "categoria",
+                "value": "pagos"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        80,
+        -2976
+      ],
+      "id": "c7072b80-df44-45f4-a0bb-f3e6ef361a30",
+      "name": "buscar_pagos",
+      "credentials": {
+        "pineconeApi": {
+          "id": "YvtstHVW5fOXXNWd",
+          "name": "Pinecone account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "embed-multilingual-v3.0"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        -2832
+      ],
+      "id": "c462894b-931b-445d-8fed-9eb0784605c6",
+      "name": "Embeddings Cohere4",
+      "credentials": {
+        "cohereApi": {
+          "id": "bsfRiLt8qj3wFq6L",
+          "name": "Cohere account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Usa esta herramienta cuando el usuario pregunte sobre garantía de productos, cobertura o cómo hacerla válida.",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "agente-ia-rag",
+          "mode": "list",
+          "cachedResultName": "agente-ia-rag"
+        },
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "categoria",
+                "value": "garantias"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        -192,
+        -2960
+      ],
+      "id": "4d9b3caa-6bbe-4117-8213-c88dadc40b09",
+      "name": "buscar_garantias",
+      "credentials": {
+        "pineconeApi": {
+          "id": "YvtstHVW5fOXXNWd",
+          "name": "Pinecone account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2d8c1570-73ad-4871-884c-71a14c58c31d",
+              "name": "=output",
+              "value": "Lo siento, solo puedo responder preguntas relacionadas con reembolsos, programa de afiliados, envíos, métodos de pago o garantías de productos de BimBam Buy. Para otras consultas, contacta a soporte humano.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -656,
+        -3104
+      ],
+      "id": "d9f6ff0d-16a2-4e32-8bd6-41e2d73e0664",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        -1504,
+        -3184
+      ],
+      "id": "ebdebc99-c9f2-4c7a-948c-407b3f53910b",
+      "name": "Chat Memory Manager"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionId }}",
+        "sessionTTL": 2400,
+        "contextWindowLength": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+      "typeVersion": 1.6,
+      "position": [
+        -1488,
+        -2992
+      ],
+      "id": "3660eafd-4b86-4fea-b97d-11db6b599cc2",
+      "name": "Redis Chat Memory1",
+      "credentials": {
+        "redis": {
+          "id": "Hz1hzC4Hx4mKtB3L",
+          "name": "Redis account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Chat Memory Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Cohere": {
+      "ai_embedding": [
+        [
+          {
+            "node": "buscar_reembolsos",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_reembolsos": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Cohere1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "buscar_afiliados",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_afiliados": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Cohere2": {
+      "ai_embedding": [
+        [
+          {
+            "node": "buscar_envios",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_envios": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Cohere3": {
+      "ai_embedding": [
+        [
+          {
+            "node": "buscar_pagos",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_pagos": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Cohere4": {
+      "ai_embedding": [
+        [
+          {
+            "node": "buscar_garantias",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_garantias": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Chat Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "Chat Memory Manager",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Memory Manager": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "b272d208-4abf-48e7-8c2f-edd333ab48bf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "964d10f68004bc72323e7156e4be9395db4db6821c043b67f0e2d34d0e1a656f"
+  },
+  "nodeGroups": [],
+  "id": "FpwIS6E0rRTN8kqI",
+  "tags": []
+}
