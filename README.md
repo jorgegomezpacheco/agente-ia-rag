@@ -21,11 +21,11 @@
 - [Instrucciones de instalación](#-instrucciones-de-instalación-desde-cero)
 - [Instrucciones de ejecución](#-instrucciones-de-ejecución-uso-del-agente)
 - [Notas técnicas y soluciones a problemas encontrados](#-notas-técnicas-y-soluciones-a-problemas-encontrados)
-- [Mantenimiento y actualización de documentos](#-mantenimiento-y-actualización-de-documentos)
 - [Ejemplos de preguntas y respuestas](#-ejemplos-de-preguntas-y-respuestas)
 - [Evidencia del despliegue](#-evidencia-del-despliegue)
 - [Estructura del repositorio](#-estructura-del-repositorio)
 - [Decisiones de arquitectura](#-decisiones-de-arquitectura)
+- [Trabajo futuro](#-trabajo-futuro)
 - [Historial de desarrollo](#-historial-de-desarrollo)
 
 ---
@@ -44,13 +44,13 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 
 | Requisito | Estado |
 |---|---|
-| Agente funcional que responda preguntas en lenguaje natural usando documentos | ⏳ En construcción |
+| Agente funcional que responda preguntas en lenguaje natural usando documentos | ✅ Completo y probado — ver [Ejemplos de preguntas y respuestas](#-ejemplos-de-preguntas-y-respuestas) |
 | Documentación utilizada para alimentar el RAG | ✅ Completo — 5 PDFs de BimBam Buy, 124 fragmentos vectorizados |
 | Código del proyecto en repositorio GitHub organizado, con URL pública y acceso público | ✅ Completo |
-| README con descripción, arquitectura, tecnologías, código fuente, instrucciones de instalación y ejecución, ejemplos de preguntas/respuestas | ✅ Completo (ejemplos pendientes de completar tras publicar el agente) |
-| Evidencia del deploy (capturas/video) dentro del README | ⚠️ Parcial — evidencia de la base de conocimiento lista; falta evidencia del agente/chat |
+| README con descripción, arquitectura, tecnologías, código fuente, instrucciones de instalación y ejecución, ejemplos de preguntas/respuestas | ✅ Completo |
+| Evidencia del deploy (capturas/video) dentro del README | ✅ Completo — capturas de las 5 categorías + video del workflow en ejecución |
 | Historial de commits | ✅ En curso, ver [Historial de desarrollo](#-historial-de-desarrollo) |
-| Deploy disponible mediante URL pública | ⏳ Pendiente — falta publicar el Chat Trigger de n8n |
+| Deploy disponible mediante URL pública | ⏳ Pendiente — falta publicar el Chat Trigger de n8n con "Make Chat Publicly Available" |
 
 ---
 
@@ -68,21 +68,28 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
                     Usuario (navegador, sin registro)
                               │
                               ▼
-        ┌──────────────────────────────────────────┐
-        │        n8n Cloud (jorgegomezpacheco)        │
-        │                                              │
-        │   Chat Trigger ──► AI Agent                  │
-        │  (URL pública)         │                      │
-        │                        ├── Ollama Cloud       │
-        │                        │   (LLM, vía API)     │
-        │                        │                      │
-        │                        ├── Simple Memory      │
-        │                        │   (historial de      │
-        │                        │    conversación)     │
-        │                        │                      │
-        │                        └── 5 Tools Pinecone   │
-        │                            (uno por categoría)│
-        └──────────────────────────────────────────┘
+        ┌──────────────────────────────────────────────────┐
+        │              n8n Cloud (jorgegomezpacheco)          │
+        │                                                      │
+        │   Chat Trigger                                       │
+        │       │                                               │
+        │       ▼                                               │
+        │   Chat Memory Manager ──► Redis Chat Memory            │
+        │   (lee historial reciente, no escribe)  (misma sesión) │
+        │       │                                               │
+        │       ▼                                               │
+        │   Basic LLM Chain (clasificador, CON contexto)         │
+        │       │                                               │
+        │       ▼                                               │
+        │   IF ¿relacionado con BimBam Buy?                     │
+        │       │                        │                       │
+        │      SÍ                       NO                      │
+        │       ▼                        ▼                       │
+        │   AI Agent                 Set (mensaje fijo)          │
+        │    ├── Ollama Chat Model                               │
+        │    ├── Redis Chat Memory (TTL 40 min, ventana 18)       │
+        │    └── 5 Tools Pinecone (uno por categoría)             │
+        └──────────────────────────────────────────────────┘
                                           │
                                           ▼
                           ┌───────────────────────────┐
@@ -90,20 +97,17 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
                           │  HTTP Request → Code (fix     │
                           │  mimeType) → Pinecone Vector  │
                           │  Store (Insert)               │
-                          │  ├─ Default Data Loader        │
-                          │  │   (+ metadata + Text        │
-                          │  │    Splitter)                │
-                          │  └─ Embeddings Cohere           │
                           └───────────────────────────┘
 ```
 
 **Flujo de consulta (usuario final):**
-1. El usuario abre la URL pública del chat.
-2. Escribe su pregunta en lenguaje natural (ej. "¿Cuánto tarda un reembolso?").
-3. El **AI Agent** recibe el mensaje junto con el historial de la conversación (Memory).
-4. El agente elige, según la pregunta, cuál de los 5 Tools de Pinecone consultar (reembolsos, afiliados, envíos, pagos o garantías), filtrando por `categoria`.
-5. Los fragmentos recuperados + la pregunta se envían a **Ollama Cloud**, que genera la respuesta final.
-6. La respuesta se muestra al usuario en la misma ventana de chat.
+1. El usuario abre la URL pública del chat y escribe su pregunta.
+2. El **Chat Memory Manager** recupera el historial reciente de la sesión (sin modificarlo), dándole contexto al clasificador.
+3. El **Basic LLM Chain** clasifica si la pregunta actual —considerando ese historial— está relacionada con alguno de los 5 temas de BimBam Buy, respondiendo únicamente "SI" o "NO".
+4. Si es "NO", un nodo **Set** responde con un mensaje fijo indicando el alcance del agente, sin consumir tokens del AI Agent principal.
+5. Si es "SI", el **AI Agent** procesa la pregunta con su propia memoria de conversación (Redis, TTL 40 min) y elige, según el tema, cuál de los 5 Tools de Pinecone consultar.
+6. Los fragmentos recuperados + la pregunta se envían a **Ollama Cloud** (temperatura 0.3, para minimizar alucinaciones), que genera la respuesta final.
+7. La respuesta se muestra al usuario en la misma ventana de chat.
 
 **Flujo de carga de documentos (administrador, proceso aparte, no público):**
 1. Se ejecuta manualmente (Manual Trigger) el workflow **"Carga de Documentos - BimBam Buy"**.
@@ -117,10 +121,10 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 | Tecnología | Rol en el proyecto | Costo |
 |---|---|---|
 | **n8n Cloud** | Orquestador del agente: workflows visuales, Chat Trigger (interfaz + URL pública), AI Agent | Free trial / plan básico |
-| **Ollama Cloud** | Modelo de lenguaje (LLM) vía API, genera las respuestas finales del agente | Gratis (con límites de uso) |
+| **Ollama Cloud** (`gpt-oss:20b`) | Modelo de lenguaje (LLM) vía API — genera respuestas (temperatura 0.3) y clasifica preguntas | Gratis (con límites de uso) |
 | **Cohere** (`embed-multilingual-v3.0`) | Genera los embeddings (vectores) tanto de los documentos como de las preguntas del usuario | Gratis (con límites de uso) |
-| **Pinecone** | Vector Store — almacena y busca los fragmentos de documentación por similitud semántica, con soporte de metadata y borrado selectivo | Gratis (plan Starter) |
-| **Simple Memory** (nodo nativo de n8n) | Mantiene el historial de conversación durante la sesión del usuario | Gratis, sin configuración adicional |
+| **Pinecone** | Vector Store — almacena y busca los fragmentos de documentación por similitud semántica, con soporte de metadata | Gratis (plan Starter) |
+| **Redis Cloud** | Memoria de conversación persistente, con expiración automática por inactividad (TTL) | Gratis (plan de 30 MB) |
 
 ---
 
@@ -128,12 +132,13 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 
 | Archivo | Qué contiene | Formato |
 |---|---|---|
-| [`workflows/carga-documentos.json`](./workflows/carga-documentos.json) | Workflow de carga inicial: recorre los 5 PDFs de BimBam Buy, corrige su mime type, los vectoriza e inserta en Pinecone con metadata. **Verificado: 124 fragmentos insertados correctamente.** | JSON (exportado de n8n) |
-| [`workflows/agente-rag.json`](./workflows/agente-rag.json) | Workflow principal: Chat Trigger + AI Agent + conexiones a Ollama Cloud, Memory y los 5 Tools de Pinecone | JSON (exportado de n8n) |
-| [`workflows/actualizar-documento.json`](./workflows/actualizar-documento.json) | Workflow de mantenimiento: borra los vectores de un `doc_id` específico e inserta la versión actualizada del documento | JSON (exportado de n8n) |
+| [`workflows/carga-documentos.json`](./workflows/carga-documentos.json) | Workflow de carga inicial: recorre los 5 PDFs de BimBam Buy, corrige su mime type, los vectoriza e inserta en Pinecone con metadata. Verificado: 124 fragmentos insertados. | JSON (exportado de n8n) |
+| [`workflows/agente-rag.json`](./workflows/agente-rag.json) | Workflow principal: Chat Trigger, guardrail (Chat Memory Manager + Basic LLM Chain + IF), AI Agent con Ollama, Redis Chat Memory y 5 Tools de Pinecone. Probado con 6 casos reales. | JSON (exportado de n8n) |
 | [`docs/documentacion-empresa/`](./docs/documentacion-empresa) | Los 5 PDFs oficiales de BimBam Buy usados como base de conocimiento | PDF |
 
 > 💡 Los workflows de n8n son "código visual": cada nodo equivale a un bloque de lógica, y el archivo `.json` exportado contiene toda esa lógica en formato texto — por lo tanto, es código versionable y revisable, aunque no se escriba línea por línea como Python o JavaScript.
+
+> 🔧 Un tercer workflow de mantenimiento (actualización/incorporación de nuevos documentos) está diseñado pero pendiente de implementación — ver [Trabajo futuro](#-trabajo-futuro).
 
 ---
 
@@ -162,30 +167,33 @@ Esta sección permite que **cualquier persona, sin conocer el proyecto previamen
 - Cuenta de [Ollama](https://ollama.com/) (API Key para Ollama Cloud)
 - Cuenta de [Cohere](https://cohere.com/) (API Key)
 - Cuenta de [Pinecone](https://www.pinecone.io/) (API Key)
+- Cuenta de [Redis Cloud](https://redis.io/try-free/) (host, puerto, password)
 - Cuenta de GitHub (para acceder a los documentos fuente vía URL raw)
 
 ### Pasos de instalación
 
 1. **Crear el índice en Pinecone**: nombre `agente-ia-rag`, dimensión `1024` (compatible con `embed-multilingual-v3.0` de Cohere), métrica `cosine`, tipo de vector `Denso`.
 
-2. **Crear cuenta en n8n Cloud** y configurar las credenciales:
+2. **Crear una base de datos en Redis Cloud** (plan gratuito, 30 MB es suficiente).
+
+3. **Crear cuenta en n8n Cloud** y configurar las credenciales:
    - *Ollama*: Base URL `https://ollama.com` + API Key.
    - *Cohere*: API Key.
    - *Pinecone*: API Key.
+   - *Redis*: host, puerto, password (SSL deshabilitado según la configuración de este proyecto).
 
-3. **Clonar/consultar este repositorio** para obtener los workflows y documentos:
+4. **Clonar/consultar este repositorio** para obtener los workflows y documentos:
    ```bash
    git clone https://github.com/jorgegomezpacheco/agente-ia-rag.git
    ```
 
-4. **Importar los workflows en n8n** (`Workflows → Import from File`):
+5. **Importar los workflows en n8n** (`Workflows → Import from File`):
    - `workflows/carga-documentos.json`
-   - `workflows/actualizar-documento.json`
    - `workflows/agente-rag.json`
 
-5. **Cargar la base de conocimiento**: abrir `carga-documentos.json` y ejecutar manualmente (Manual Trigger) — procesa los 5 PDFs de BimBam Buy y los inserta en Pinecone con su metadata correspondiente.
+6. **Cargar la base de conocimiento**: abrir `carga-documentos.json` y ejecutar manualmente (Manual Trigger) — procesa los 5 PDFs de BimBam Buy y los inserta en Pinecone con su metadata correspondiente.
 
-6. **Publicar el agente**: abrir `agente-rag.json` → nodo Chat Trigger → activar **"Make Chat Publicly Available"** → modo **"Hosted Chat"** → **Publish/Active** → copiar la Chat URL generada.
+7. **Publicar el agente**: abrir `agente-rag.json` → nodo Chat Trigger → activar **"Make Chat Publicly Available"** → modo **"Hosted Chat"** → **Publish/Active** → copiar la Chat URL generada.
 
 Con esto, la instalación queda completa y el sistema listo para usarse (ver sección siguiente).
 
@@ -202,23 +210,23 @@ Esta sección explica cómo **usar** el proyecto ya instalado y desplegado — a
    - *"¿Cómo me uno al programa de afiliados?"*
    - *"¿Qué garantía tienen los productos?"*
 3. El agente responde en la misma ventana, basándose exclusivamente en la documentación oficial cargada.
-4. La conversación mantiene contexto mientras la sesión esté activa — se pueden hacer preguntas de seguimiento sin repetir el contexto completo.
+4. La conversación mantiene contexto mientras la sesión esté activa (hasta 40 minutos de inactividad) — se pueden hacer preguntas de seguimiento sin repetir el contexto completo, incluso con referencias implícitas (ej. "¿y qué pasa si ya pasó ese plazo?").
+5. Si se pregunta algo fuera del alcance de BimBam Buy, el agente lo indica amablemente y sugiere contactar a soporte humano, sin intentar inventar una respuesta.
 
 ### Para el administrador (mantener la base de conocimiento)
 - **Cargar documentos por primera vez**: ejecutar manualmente `carga-documentos.json` desde el editor de n8n (botón "Execute workflow").
-- **Actualizar un documento existente**: ejecutar manualmente `actualizar-documento.json`, indicando el `doc_id` correspondiente (ver [Mantenimiento y actualización de documentos](#-mantenimiento-y-actualización-de-documentos)).
-- **Monitorear ejecuciones**: en n8n, pestaña "Executions" de cada workflow, para verificar que las ejecuciones automáticas/manuales terminen sin errores.
+- **Actualizar o agregar nuevos documentos**: funcionalidad planeada, ver [Trabajo futuro](#-trabajo-futuro).
+- **Monitorear ejecuciones**: en n8n, pestaña "Executions" de cada workflow, para verificar que las ejecuciones terminen sin errores.
 
 ---
 
 ## 🔧 Notas técnicas y soluciones a problemas encontrados
 
-Durante la implementación del workflow de carga de documentos se presentó un problema técnico relevante, documentado aquí como parte del proceso de desarrollo:
+### 1. Mime type incorrecto al descargar PDFs desde GitHub raw
 
-**Problema:** al descargar los PDFs desde GitHub raw (`raw.githubusercontent.com`), los archivos llegan con el mime type genérico `application/octet-stream` en lugar de `application/pdf`. Esto provocaba que el nodo **Default Data Loader** de n8n rechazara los archivos con los errores `Unsupported mime type: application/octet-stream` y, tras forzar manualmente el "Data Format" a PDF, `Mime type doesn't match selected loader`.
+**Problema:** los PDFs descargados desde `raw.githubusercontent.com` llegan con mime type genérico `application/octet-stream` en lugar de `application/pdf`, provocando que el **Default Data Loader** los rechazara.
 
-**Solución:** se agregó un nodo **Code (JavaScript)** entre `HTTP Request` y `Pinecone Vector Store`, que sobrescribe explícitamente el mime type del archivo binario antes de que llegue al Data Loader:
-
+**Solución:** nodo **Code (JavaScript)** entre `HTTP Request` y `Pinecone Vector Store` que sobrescribe el mime type manualmente:
 ```javascript
 for (const item of $input.all()) {
   item.binary.data.mimeType = 'application/pdf';
@@ -226,41 +234,57 @@ for (const item of $input.all()) {
 return $input.all();
 ```
 
-Con este ajuste, los 5 documentos se procesaron correctamente, generando 124 fragmentos (`blobType: "application/pdf"` confirmado en los registros de Pinecone).
+### 2. Filtrado dinámico de metadata no soportado en Tools de AI Agent
 
----
+**Problema:** n8n no permite usar `$fromAI()` en el filtro de metadata de un Vector Store conectado como Tool de un AI Agent.
 
-## 🔄 Mantenimiento y actualización de documentos
+**Solución:** se implementaron **5 herramientas Pinecone independientes** (una por categoría), cada una con un filtro de metadata fijo y una descripción clara, permitiendo que el AI Agent elija automáticamente la herramienta correcta según el tema de la pregunta.
 
-Cuando un documento de BimBam Buy se actualiza (ej. cambia la política de reembolsos), el proceso es:
+### 3. Clasificador sin memoria de conversación
 
-1. Reemplazar el PDF correspondiente en `/docs/documentacion-empresa` y subir el cambio a GitHub.
-2. Ejecutar manualmente el workflow `workflows/actualizar-documento.json`, indicando el `doc_id` del documento a actualizar.
-3. El workflow primero **borra** todos los vectores asociados a ese `doc_id` en Pinecone (`Delete` filtrado por metadata), y luego **inserta** los vectores del documento actualizado — garantizando que no queden fragmentos obsoletos mezclados con los nuevos.
+**Problema:** un guardrail (clasificador de tema) que evalúa cada mensaje de forma aislada rechaza incorrectamente preguntas de seguimiento con referencias implícitas (ej. "¿y qué pasa si ya pasó ese plazo?" tras haber hablado de reembolsos).
 
-Este mecanismo de borrado + reinserción por `doc_id` es posible gracias a que Pinecone soporta filtrado y borrado nativo por metadata, a diferencia de alternativas más básicas (como el Simple Vector Store nativo de n8n) que no ofrecen esta capacidad de forma directa.
+**Solución:** se agregó un nodo **Chat Memory Manager** (modo "Get Many Messages") antes del clasificador, apuntando a la misma sesión de **Redis Chat Memory** que usa el AI Agent — de forma que el clasificador *lee* el historial reciente sin escribir en él (evitando contaminar la memoria real de la conversación). El prompt del clasificador fue ajustado para usar ese historial como contexto, pero sin asumir que toda la sesión es válida solo porque comenzó siendo relevante:
+```javascript
+{{ $json.messages.map(m => (m.human ? 'Usuario: ' + m.human + '\n' : '') + (m.ai ? 'Asistente: ' + (typeof m.ai === 'string' ? m.ai : JSON.stringify(m.ai)) : '')).join('\n') }}
+```
+(Se corrigió también un bug inicial donde la expresión asumía una estructura `{type, text}` que no correspondía al formato real devuelto por Redis Chat Memory, que usa claves `human`/`ai`/`tool` por turno.)
+
+### 4. El nodo Pinecone Vector Store de n8n no soporta borrar por metadata
+
+**Hallazgo:** a diferencia de lo asumido inicialmente, el nodo visual **Pinecone Vector Store** de n8n no expone una operación de borrado por filtro de metadata — es una limitación reportada por la comunidad de n8n desde 2024, aún sin resolver de forma nativa. Pinecone como servicio sí soporta este borrado vía su API REST, pero el nodo de n8n no lo implementa en su interfaz visual.
+
+**Implicancia:** el workflow de mantenimiento (actualizar o agregar documentos con borrado limpio) requiere un nodo **HTTP Request** llamando directamente al endpoint de borrado de la API de Pinecone, en vez de únicamente el nodo Pinecone Vector Store estándar. Ver diseño planeado en [Trabajo futuro](#-trabajo-futuro).
 
 ---
 
 ## 💬 Ejemplos de preguntas y respuestas
 
-| Pregunta del usuario | Respuesta del agente |
-|---|---|
-| `[PENDIENTE: probar tras publicar el agente]` | `[PENDIENTE]` |
-| `[PENDIENTE]` | `[PENDIENTE]` |
-| `[PENDIENTE]` | `[PENDIENTE]` |
+Pruebas reales realizadas sobre el agente en ejecución, cubriendo las 5 categorías y el rechazo de preguntas fuera de alcance:
+
+| # | Pregunta del usuario | Categoría / Tool | Resumen de la respuesta del agente |
+|---|---|---|---|
+| 1 | ¿Qué cubre la garantía de productos? | `buscar_garantias` | Lista de fallas cubiertas (defectos de fabricación, ensamblaje, problemas de encendido) y exclusiones (daños por golpes, agua, manipulación, desgaste normal), con resumen final. |
+| 2 | ¿Qué métodos de pago aceptan? | `buscar_pagos` | Tarjeta de crédito/débito, transferencia bancaria, efectivo en puntos habilitados, billeteras digitales y financiamiento en cuotas (según país y disponibilidad). |
+| 3 | ¿Cuánto cuesta y demora el envío? | `buscar_envios` | Tabla con tiempos y costos por zona (urbana, secundaria, cobertura extendida), más detalles de preparación del pedido y métodos de envío disponibles. |
+| 4 | ¿Cómo me hago afiliado? | `buscar_afiliados` | Requisitos, proceso de postulación paso a paso, tiempos de revisión (1-3 días hábiles), qué incluye la aprobación y cómo se generan y liquidan las comisiones. |
+| 5 | ¿Cuánto tarda un reembolso? | `buscar_reembolsos` | Plazo estándar de 5-10 días hábiles desde la aprobación, y factores que pueden extenderlo (método de pago, país, validaciones adicionales). |
+| 6 | ¿Quién ganó el mundial? | *(guardrail — sin Tool)* | *"Lo siento, solo puedo responder preguntas relacionadas con reembolsos, programa de afiliados, envíos, métodos de pago o garantías de productos de BimBam Buy. Para otras consultas, contacta a soporte humano."* — rechazada correctamente sin consumir tokens del AI Agent. |
+
+> ✅ Adicionalmente se verificó que preguntas de seguimiento con referencias implícitas (ej. *"¿y qué pasa si ya pasó ese plazo?"* tras una pregunta sobre reembolsos) son correctamente interpretadas gracias al guardrail con memoria de contexto (Chat Memory Manager + Redis), sin perder continuidad de la conversación.
+
+Capturas de cada ejecución disponibles en la sección de [Evidencia del despliegue](#-evidencia-del-despliegue).
 
 ---
 
 ## 📸 Evidencia del despliegue
 
+### Carga de documentos (base de conocimiento)
+
 | Evidencia | Estado |
 |---|---|
-| Carga de documentos ejecutada con éxito en n8n (124/124 items, sin errores) | ✅ Ver captura abajo |
-| Registros verificados en Pinecone (124 records, metadata correcta por `doc_id`) | ✅ Ver captura abajo |
-| Video demostrativo del workflow de carga funcionando | ✅ Ver abajo |
-| Workflow del agente en n8n Cloud | `[PENDIENTE]` |
-| Chat público del agente respondiendo | `[PENDIENTE]` |
+| Carga de documentos ejecutada con éxito en n8n (124/124 items, sin errores) | ✅ |
+| Registros verificados en Pinecone (124 records, metadata correcta por `doc_id`) | ✅ |
 
 ![Carga de documentos exitosa en n8n](./screenshots/pinecone-carga-exitosa.png)
 
@@ -268,7 +292,25 @@ Este mecanismo de borrado + reinserción por `doc_id` es posible gracias a que P
 
 https://github.com/jorgegomezpacheco/agente-ia-rag/raw/main/screenshots/demo-carga-documentos.mp4
 
-> Si el video no se reproduce embebido directamente en GitHub, descárgalo desde el enlace de arriba o desde [`screenshots/demo-carga-documentos.mp4`](./screenshots/demo-carga-documentos.mp4).
+### Agente RAG en funcionamiento (5 categorías probadas)
+
+Cada captura muestra la ejecución real del workflow `agente-rag.json` en n8n, con la Tool de Pinecone activada y la respuesta generada por el agente:
+
+| Categoría | Captura |
+|---|---|
+| Garantías | ![Prueba garantías](./screenshots/agente-prueba-garantias.png) |
+| Métodos de pago | ![Prueba pagos](./screenshots/agente-prueba-pagos.png) |
+| Envíos | ![Prueba envíos](./screenshots/agente-prueba-envios.png) |
+| Programa de afiliados | ![Prueba afiliados](./screenshots/agente-prueba-afiliados.png) |
+| Reembolsos | ![Prueba reembolsos](./screenshots/agente-prueba-reembolsos.png) |
+
+**Video demostrativo (Agente RAG completo en funcionamiento):**
+
+https://github.com/jorgegomezpacheco/agente-ia-rag/raw/main/screenshots/demo-agente-rag.mp4
+
+> Si los videos no se reproducen embebidos directamente en GitHub, descárgalos desde los enlaces de arriba o desde la carpeta [`/screenshots`](./screenshots).
+
+`[PENDIENTE: captura del chat público respondiendo, una vez publicado el Chat Trigger con URL pública]`
 
 ---
 
@@ -278,12 +320,11 @@ https://github.com/jorgegomezpacheco/agente-ia-rag/raw/main/screenshots/demo-car
 agente-ia-rag/
 ├── README.md                          # Este archivo
 ├── workflows/
-│   ├── agente-rag.json                # Workflow principal del agente
-│   ├── carga-documentos.json          # Workflow de carga inicial (5 PDFs) — verificado
-│   └── actualizar-documento.json      # Workflow de actualización (borrar + recargar)
+│   ├── agente-rag.json                # Workflow principal del agente — probado
+│   └── carga-documentos.json          # Workflow de carga inicial (5 PDFs) — verificado
 ├── docs/
 │   └── documentacion-empresa/         # 5 PDFs oficiales de BimBam Buy
-├── screenshots/                       # Evidencia visual y video del proyecto funcionando
+├── screenshots/                       # Evidencia visual y videos del proyecto funcionando
 └── docker/                            # ⚠️ Referencia histórica — ver nota abajo
 ```
 
@@ -295,9 +336,28 @@ agente-ia-rag/
 
 **OCI → n8n Cloud:** el proyecto se planificó originalmente para OCI (VM con n8n y Ollama autoalojados). Se presentó indisponibilidad reiterada de capacidad ("Out of host capacity") para instancias Ampere A1 en la región Chile Central (Santiago). El challenge permite explícitamente elegir la plataforma de despliegue, priorizando que el agente funcione correctamente — por lo que se migró a n8n Cloud. La configuración original se conserva en `/docker` como evidencia del proceso.
 
-**Simple Vector Store → Pinecone:** se requería la capacidad de actualizar documentos de forma limpia (borrar los fragmentos obsoletos de un documento específico e insertar la versión nueva, sin afectar el resto de la base de conocimiento). El Simple Vector Store nativo de n8n no ofrece borrado selectivo por metadata de forma directa, por lo que se optó por Pinecone, que soporta esta operación de forma nativa.
+**Simple Vector Store → Pinecone:** se buscaba una base vectorial con mejor soporte de metadata y mayor robustez que el Simple Vector Store nativo de n8n (que no persiste datos entre reinicios), por lo que se optó por Pinecone.
 
-**Un Tool de Pinecone por categoría (en vez de un filtro dinámico único):** n8n presenta una limitación conocida que impide usar `$fromAI()` en el filtro de metadata cuando el Vector Store está conectado como Tool de un AI Agent. Como alternativa robusta y más realista a un entorno de producción departamentalizado, se implementaron 5 herramientas Pinecone independientes (una por categoría: reembolsos, afiliados, envíos, pagos, garantías), cada una con su propio filtro fijo y una descripción clara que permite al AI Agent elegir automáticamente cuál usar según la pregunta del usuario.
+**Un Tool de Pinecone por categoría:** n8n no permite usar `$fromAI()` en el filtro de metadata de un Vector Store conectado como Tool de un AI Agent. Como alternativa robusta y más realista a un entorno de producción departamentalizado, se implementaron 5 herramientas Pinecone independientes, cada una con su propio filtro fijo y una descripción clara que permite al AI Agent elegir automáticamente cuál usar.
+
+**Guardrail (clasificador) antes del AI Agent:** para evitar que preguntas ajenas a BimBam Buy consuman tokens innecesariamente en el AI Agent principal (con sus 5 Tools y system prompt extenso), se agregó una etapa previa de clasificación (Basic LLM Chain) con temperatura muy baja, que decide si la pregunta amerita pasar al agente completo o recibir una respuesta fija indicando el alcance del asistente.
+
+**Chat Memory Manager como "memoria de solo lectura" para el clasificador:** para que el guardrail entienda referencias implícitas en preguntas de seguimiento (ej. "¿y qué pasa si ya pasó ese plazo?") sin perder precisión ante temas realmente ajenos, se usa un Chat Memory Manager que *lee* el historial reciente de la misma sesión de Redis que usa el AI Agent, sin escribir en él — evitando así contaminar la memoria real de la conversación con las clasificaciones internas del guardrail.
+
+**Redis Chat Memory con TTL:** se eligió Redis (en vez de Simple Memory) para la memoria del AI Agent porque soporta expiración automática por inactividad (Session TTL de 40 minutos), liberando recursos de sesiones abandonadas sin intervención manual — un comportamiento estándar en sistemas de chat de producción.
+
+---
+
+## 🔮 Trabajo futuro
+
+**Workflow de mantenimiento (`actualizar-documento.json`)** — diseñado pero pendiente de implementación. No es un requisito explícito del challenge, se plantea como mejora de robustez del proyecto.
+
+Diseño planeado:
+1. **Trigger manual** (administrador), con los campos `url`, `doc_id` y `categoria` del documento a cargar o actualizar — por ejemplo, un nuevo documento **`contacto-soporte.pdf`** (`doc_id: contacto-soporte`, `categoria: contacto-soporte`), que ampliaría el alcance del agente a una sexta categoría de atención al cliente.
+2. **Nodo HTTP Request** llamando directamente al endpoint de borrado de la API de Pinecone (`DELETE` con filtro por `doc_id` en el body), ya que el nodo visual de n8n no soporta esta operación de forma nativa (ver [Notas técnicas #4](#-notas-técnicas-y-soluciones-a-problemas-encontrados)). Este paso es seguro de ejecutar tanto para documentos existentes (borra los fragmentos obsoletos) como para documentos completamente nuevos (no encuentra nada que borrar, sin generar error).
+3. **Descarga, corrección de mime type, fragmentación, vectorización e inserción** del documento — reutilizando el mismo patrón ya construido y verificado en `carga-documentos.json`.
+
+Con este diseño, un mismo workflow serviría tanto para **actualizar un documento existente** como para **incorporar documentos completamente nuevos** a la base de conocimiento, sin necesidad de workflows separados. De implementarse, agregar un sexto Tool de Pinecone (`buscar_contacto_soporte`) al AI Agent para que pueda responder también sobre este nuevo tema.
 
 ---
 
@@ -308,14 +368,19 @@ agente-ia-rag/
 - [x] Intento de despliegue en OCI (bloqueado por indisponibilidad de capacidad)
 - [x] Pivote de arquitectura a n8n Cloud + Ollama Cloud
 - [x] Definición de la empresa ficticia (BimBam Buy) y sus 5 documentos base
-- [x] Selección de Pinecone + Cohere como stack de vectorización (soporte de actualización por metadata)
+- [x] Selección de Pinecone + Cohere como stack de vectorización
 - [x] Creación del índice en Pinecone (1024 dim, cosine, denso)
-- [x] Configuración de credenciales (Ollama, Cohere, Pinecone) en n8n
-- [x] **Carga y vectorización de los 5 documentos de BimBam Buy — 124 fragmentos insertados, verificado en Pinecone**
+- [x] Configuración de credenciales (Ollama, Cohere, Pinecone, Redis) en n8n
+- [x] Carga y vectorización de los 5 documentos de BimBam Buy — 124 fragmentos, verificado en Pinecone
 - [x] Resolución de incompatibilidad de mime type (PDF vía GitHub raw)
-- [ ] Construcción del workflow del AI Agent con 5 Tools por categoría
+- [x] Construcción del AI Agent con 5 Tools de Pinecone por categoría
+- [x] Implementación de guardrail (clasificador) para filtrar preguntas fuera de tema
+- [x] Configuración de Redis Chat Memory con TTL (40 min) para el AI Agent
+- [x] Corrección del guardrail para mantener contexto en preguntas de seguimiento (Chat Memory Manager)
+- [x] Pruebas de preguntas/respuestas — 5 categorías + rechazo de tema ajeno, verificado
+- [x] Evidencia visual completa (capturas por categoría + videos de ambos workflows)
 - [ ] Publicación del Chat Trigger con URL pública
-- [ ] Pruebas de preguntas/respuestas
+- [ ] Workflow de mantenimiento/actualización de documentos, incluyendo `contacto-soporte.pdf` (ver Trabajo futuro)
 - [ ] Documentación final del README
 
 ---
