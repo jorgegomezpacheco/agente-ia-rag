@@ -44,7 +44,7 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 | Requisito | Estado |
 |---|---|
 | Agente funcional que responda preguntas en lenguaje natural usando documentos | ✅ Completo y probado — ver [Ejemplos de preguntas y respuestas](#-ejemplos-de-preguntas-y-respuestas) |
-| Documentación utilizada para alimentar el RAG | ✅ Completo — 6 PDFs de BimBam Buy vectorizados |
+| Documentación utilizada para alimentar el RAG | ✅ Completo — 6 PDFs de BimBam Buy, 145 fragmentos vectorizados |
 | Código del proyecto en repositorio GitHub organizado, con URL pública y acceso público | ✅ Completo |
 | README con descripción, arquitectura, tecnologías, código fuente, instrucciones de instalación y ejecución, ejemplos de preguntas/respuestas | ✅ Completo |
 | Evidencia del deploy (capturas/video) dentro del README | ✅ Completo |
@@ -101,7 +101,8 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 │ HTTP → Code (mime) │   │ HTTP → Code (mime) →       │   │ Vector dummy → Query      │
 │ → Pinecone Insert, │   │ Extract from File →        │   │ Pinecone (doc_id) →       │
 │ en loop            │   │ Code (limpia <br>/\n) →    │   │ HTTP Delete (API          │
-│                    │   │ Pinecone Insert            │   │ Pinecone, Header Auth)    │
+│ (124 fragmentos)   │   │ Pinecone Insert            │   │ Pinecone, Header Auth)    │
+│                    │   │ (21 fragmentos)            │   │                           │
 └──────────────┘   └──────────────────────┘   └──────────────────────┘
 ```
 
@@ -115,8 +116,8 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 7. La respuesta se muestra al usuario en la misma ventana de chat.
 
 **Flujos de gestión de documentos (administrador, proceso aparte, no público):**
-- **Carga inicial masiva** (`carga-documentos.json`): recorre en loop varios PDFs, descarga, corrige mime type, limpia el texto, fragmenta, vectoriza e inserta en Pinecone. ✅ Verificado: 124 fragmentos insertados (5 documentos base).
-- **Carga de documento nuevo** (`cargar-documento-nuevo.json`): agrega un único documento adicional a la base de conocimiento sin afectar los existentes — usado para incorporar `contacto-soporte.pdf`. ✅ Verificado y funcional.
+- **Carga inicial masiva** (`carga-documentos.json`): recorre en loop varios PDFs, descarga, corrige mime type, limpia el texto, fragmenta, vectoriza e inserta en Pinecone. ✅ Verificado: **124 fragmentos** insertados (5 documentos base).
+- **Carga de documento nuevo** (`cargar-documento-nuevo.json`): agrega un único documento adicional a la base de conocimiento sin afectar los existentes — usado para incorporar `contacto-soporte.pdf`. ✅ Verificado: **21 fragmentos** insertados, llevando el total de 124 a **145** en el índice de Pinecone.
 - **Eliminación de documento** (`eliminar-documento.json`): consulta y borra todos los fragmentos de un `doc_id` específico en Pinecone vía la API REST (con autenticación Header Auth), como paso previo a una recarga o para retirar un documento definitivamente. ✅ Verificado y funcional.
 
 ---
@@ -138,7 +139,7 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 | Archivo | Qué contiene | Formato |
 |---|---|---|
 | [`workflows/carga-documentos.json`](./workflows/carga-documentos.json) | Workflow de carga inicial: recorre los 5 PDFs base de BimBam Buy, corrige mime type, limpia el texto, vectoriza e inserta en Pinecone con metadata. Verificado: 124 fragmentos insertados. | JSON (exportado de n8n) |
-| [`workflows/cargar-documento-nuevo.json`](./workflows/cargar-documento-nuevo.json) | Workflow para agregar **un documento nuevo** individual a la base de conocimiento (extrae texto, limpia `<br>`/`\n`, fragmenta, vectoriza e inserta). Usado para incorporar `contacto-soporte.pdf`. | JSON (exportado de n8n) |
+| [`workflows/cargar-documento-nuevo.json`](./workflows/cargar-documento-nuevo.json) | Workflow para agregar **un documento nuevo** individual a la base de conocimiento (extrae texto, limpia `<br>`/`\n`, fragmenta, vectoriza e inserta). Usado para incorporar `contacto-soporte.pdf` (21 fragmentos, total 145 en Pinecone). | JSON (exportado de n8n) |
 | [`workflows/eliminar-documento.json`](./workflows/eliminar-documento.json) | Workflow que elimina todos los fragmentos de un `doc_id` específico en Pinecone, vía la API REST de Pinecone. | JSON (exportado de n8n) |
 | [`workflows/agente-rag.json`](./workflows/agente-rag.json) | Workflow principal: Chat Trigger (publicado, URL pública), guardrail (Chat Memory Manager + Basic LLM Chain + IF), AI Agent con Ollama, Redis Chat Memory y 6 Tools de Pinecone. Probado con 7 casos reales + prueba en producción vía URL pública. | JSON (exportado de n8n) |
 | [`docs/documentacion-empresa/`](./docs/documentacion-empresa) | Los 6 PDFs oficiales de BimBam Buy usados como base de conocimiento | PDF |
@@ -160,7 +161,14 @@ La base de conocimiento del agente está compuesta por 6 documentos oficiales (f
 | Manual de Garantía de Productos de BimBam Buy | `manual-garantia-productos` | `garantias` | Cobertura, plazos y proceso de garantía de productos |
 | Contacto y Soporte de BimBam Buy | `contacto-soporte` | `contacto-soporte` | Canales de atención (chat, correo, formulario de post-venta, centro de ayuda), qué incluir en una solicitud y buenas prácticas de contacto |
 
-Los documentos fuente se encuentran en [`/docs/documentacion-empresa`](./docs/documentacion-empresa). En conjunto, generaron más de **124 fragmentos vectorizados** en el índice de Pinecone (5 documentos base + 1 documento agregado posteriormente).
+Los documentos fuente se encuentran en [`/docs/documentacion-empresa`](./docs/documentacion-empresa).
+
+**Evolución del índice de Pinecone (`agente-ia-rag`), verificada en el panel de Pinecone:**
+
+| Etapa | Acción | Record count resultante |
+|---|---|---|
+| 1 | Carga inicial de los 5 documentos base (`carga-documentos.json`) | 124 |
+| 2 | Incorporación de `contacto-soporte.pdf` (`cargar-documento-nuevo.json`, +21 fragmentos) | **145** |
 
 ---
 
@@ -201,8 +209,8 @@ Esta sección permite que **cualquier persona, sin conocer el proyecto previamen
    - `workflows/agente-rag.json`
 
 6. **Cargar la base de conocimiento**:
-   - Ejecutar manualmente `carga-documentos.json` — procesa los 5 PDFs base y los inserta en Pinecone.
-   - Ejecutar manualmente `cargar-documento-nuevo.json` — inserta el documento adicional `contacto-soporte.pdf`.
+   - Ejecutar manualmente `carga-documentos.json` — procesa los 5 PDFs base y los inserta en Pinecone (124 fragmentos).
+   - Ejecutar manualmente `cargar-documento-nuevo.json` — inserta el documento adicional `contacto-soporte.pdf` (21 fragmentos, total 145).
 
 7. **Publicar el agente**: abrir `agente-rag.json` → nodo Chat Trigger → activar **"Make Chat Publicly Available"** → modo **"Hosted Chat"** → **Publish/Active** → copiar la Chat URL generada.
 
@@ -346,8 +354,8 @@ https://github.com/jorgegomezpacheco/agente-ia-rag/raw/main/screenshots/demo-cha
 | Evidencia | Estado |
 |---|---|
 | Carga inicial ejecutada con éxito en n8n (124/124 items, sin errores) | ✅ |
-| Registros verificados en Pinecone (124 records, metadata correcta por `doc_id`) | ✅ |
-| Carga de documento nuevo (`contacto-soporte.pdf`) ejecutada con éxito | ✅ |
+| Registros verificados en Pinecone — 124 tras la carga inicial, **145 tras incorporar `contacto-soporte.pdf`** | ✅ |
+| Carga de documento nuevo (`contacto-soporte.pdf`, 21 fragmentos) ejecutada con éxito | ✅ |
 
 ![Carga de documentos exitosa en n8n](./screenshots/pinecone-carga-exitosa.png)
 
@@ -450,7 +458,7 @@ agente-ia-rag/
 - [x] Corrección del guardrail para mantener contexto en preguntas de seguimiento (Chat Memory Manager)
 - [x] Pruebas de preguntas/respuestas — 5 categorías + rechazo de tema ajeno, verificado
 - [x] Evidencia visual completa (capturas por categoría + videos de ambos workflows)
-- [x] Construcción de `cargar-documento-nuevo.json` e incorporación de `contacto-soporte.pdf`
+- [x] Construcción de `cargar-documento-nuevo.json` e incorporación de `contacto-soporte.pdf` — 21 fragmentos, total 145 en Pinecone (verificado)
 - [x] Agregado del sexto Tool `buscar_contacto_soporte` al AI Agent — probado y funcional
 - [x] Publicación del Chat Trigger con URL pública — verificado en producción
 - [x] Evidencia del chat público (capturas de bienvenida, respuesta real, y video)
