@@ -6,25 +6,25 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        -544,
-        -64
+        0,
+        -752
       ],
-      "id": "a5a3bc42-5b8b-4fcc-b061-f5dbd5a78401",
-      "name": "When clicking ‘Execute workflow’"
+      "id": "16dbbb82-6eb6-4d95-a31d-8cf3e2436359",
+      "name": "When clicking 'Execute workflow'"
     },
     {
       "parameters": {
         "mode": "raw",
-        "jsonOutput": "{\n  \"documentos\": [\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/politica-reembolsos-devoluciones.pdf\",\n      \"doc_id\": \"politica-reembolsos-devoluciones\",\n      \"categoria\": \"reembolsos-devoluciones\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/programa-afiliados.pdf\",\n      \"doc_id\": \"programa-afiliados\",\n      \"categoria\": \"afiliados\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/guia-tiempos-costos-envio.pdf\",\n      \"doc_id\": \"guia-tiempos-costos-envio\",\n      \"categoria\": \"envios\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/faq-metodos-pago.pdf\",\n      \"doc_id\": \"faq-metodos-pago\",\n      \"categoria\": \"pagos\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/manual-garantia-productos.pdf\",\n      \"doc_id\": \"manual-garantia-productos\",\n      \"categoria\": \"garantias\"\n    }\n  ]\n}",
+        "jsonOutput": "{\n  \"documentos\": [\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/politica-reembolsos-devoluciones.pdf\",\n      \"doc_id\": \"politica-reembolsos-devoluciones\",\n      \"categoria\": \"reembolsos-devoluciones\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/programa-afiliados.pdf\",\n      \"doc_id\": \"programa-afiliados\",\n      \"categoria\": \"afiliados\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/guia-tiempos-costos-envio.pdf\",\n      \"doc_id\": \"guia-tiempos-costos-envio\",\n      \"categoria\": \"envios\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/faq-metodos-pago.pdf\",\n      \"doc_id\": \"faq-metodos-pago\",\n      \"categoria\": \"pagos\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/manual-garantia-productos.pdf\",\n      \"doc_id\": \"manual-garantia-productos\",\n      \"categoria\": \"garantias\"\n    },\n    {\n      \"url\": \"https://raw.githubusercontent.com/jorgegomezpacheco/agente-ia-rag/main/docs/documentacion-empresa/contacto-soporte.pdf\",\n      \"doc_id\": \"contacto-soporte\",\n      \"categoria\": \"contacto-soporte\"\n    }\n  ]\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -368,
-        -64
+        176,
+        -752
       ],
-      "id": "d518ff2d-5083-40e3-a4fe-039ed9a6d23c",
+      "id": "e1829176-489c-49fe-90d0-bdc0f2975f11",
       "name": "Edit Fields"
     },
     {
@@ -35,10 +35,10 @@
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
       "position": [
-        -208,
-        -64
+        336,
+        -752
       ],
-      "id": "1c1c360b-6c5c-40d6-812c-a79c1e40339b",
+      "id": "4ef75c1c-9c34-4874-bb7a-152afaff5b8f",
       "name": "Split Out"
     },
     {
@@ -48,10 +48,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -16,
-        -64
+        528,
+        -752
       ],
-      "id": "5b484e76-5b7a-4001-a587-5c8e96298f64",
+      "id": "8a479f08-83ba-49f1-ac88-04ee4774e0ef",
       "name": "Loop Over Items"
     },
     {
@@ -68,44 +68,51 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        176,
-        16
+        720,
+        -672
       ],
-      "id": "4bb645e6-e783-4fd8-8084-e04b94f38eb0",
+      "id": "95c0da97-e1a1-4aba-9f8a-b1f66df7daa3",
       "name": "HTTP Request"
     },
     {
       "parameters": {
-        "dataType": "binary",
-        "loader": "pdfLoader",
-        "textSplittingMode": "custom",
-        "options": {
-          "metadata": {
-            "metadataValues": [
-              {
-                "name": "=doc_id",
-                "value": "={{ $json.doc_id }}"
-              },
-              {
-                "name": "categoria",
-                "value": "={{ $json.categoria }}"
-              },
-              {
-                "name": "source",
-                "value": "={{ $json.url }}"
-              }
-            ]
-          }
-        }
+        "jsCode": "for (const item of $input.all()) {\n  item.binary.data.mimeType = 'application/pdf';\n}\nreturn $input.all();"
       },
-      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        -736
+      ],
+      "id": "a6054edc-aca6-4cbf-b576-8d77ae694ae2",
+      "name": "Code JS Type Pdf"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
       "position": [
-        736,
-        192
+        1088,
+        -736
       ],
-      "id": "8a87b3fa-b5d9-4350-be4d-a3eb2b2e66fd",
-      "name": "Default Data Loader"
+      "id": "8bc38f14-8d82-4e1d-842e-0e7deec33c3a",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  let text = item.json.text || '';\n  text = text\n    .replace(/<br\\s*\\/?>/gi, '\\n')   // reemplaza <br> o <br/> por salto de línea real\n    .replace(/\\\\n/g, '\\n')            // por si quedó \"\\n\" como texto literal\n    .replace(/[ \\t]+\\n/g, '\\n')       // limpia espacios antes de saltos de línea\n    .replace(/\\n{3,}/g, '\\n\\n');      // evita saltos de línea excesivos\n  item.json.text = text;\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        -736
+      ],
+      "id": "ae4753d8-2a0c-40e3-89df-6c8775fb38d2",
+      "name": "Code JS limpieza"
     },
     {
       "parameters": {
@@ -121,10 +128,10 @@
       "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
       "typeVersion": 1.3,
       "position": [
-        608,
-        -16
+        1488,
+        -704
       ],
-      "id": "6b943c0e-36e4-4f71-87e3-3cafece66032",
+      "id": "d37d304d-0bf6-4e63-8b0a-c54decfd29b4",
       "name": "Pinecone Vector Store",
       "credentials": {
         "pineconeApi": {
@@ -140,10 +147,10 @@
       "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
       "typeVersion": 1,
       "position": [
-        592,
-        208
+        1472,
+        -480
       ],
-      "id": "311968a2-7403-4cb5-946a-857d961f1dd0",
+      "id": "5afede92-f1e3-4504-b6ae-e9585f5e73fb",
       "name": "Embeddings Cohere",
       "credentials": {
         "cohereApi": {
@@ -154,6 +161,39 @@
     },
     {
       "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.text }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "=doc_id",
+                "value": "={{ $('Loop Over Items').item.json.doc_id }}"
+              },
+              {
+                "name": "categoria",
+                "value": "={{ $('Loop Over Items').item.json.categoria }}"
+              },
+              {
+                "name": "source",
+                "value": "={{ $('Loop Over Items').item.json.url }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1616,
+        -496
+      ],
+      "id": "0778207c-17e1-41bb-883c-8cebf0a5ffe4",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
         "chunkSize": 800,
         "chunkOverlap": 150,
         "options": {}
@@ -161,29 +201,16 @@
       "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
       "typeVersion": 1,
       "position": [
-        848,
-        320
+        1728,
+        -368
       ],
-      "id": "c07b38b5-979e-452e-b581-a6e08a42b3d0",
+      "id": "481292a3-5e29-4791-91c5-cd221391b565",
       "name": "Recursive Character Text Splitter"
-    },
-    {
-      "parameters": {
-        "jsCode": "for (const item of $input.all()) {\n  item.binary.data.mimeType = 'application/pdf';\n}\nreturn $input.all();"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        368,
-        -48
-      ],
-      "id": "387a6b78-55e1-4118-b573-8bf81d06b18b",
-      "name": "Code in JavaScript"
     }
   ],
   "pinData": {},
   "connections": {
-    "When clicking ‘Execute workflow’": {
+    "When clicking 'Execute workflow'": {
       "main": [
         [
           {
@@ -232,7 +259,51 @@
       "main": [
         [
           {
-            "node": "Code in JavaScript",
+            "node": "Code JS Type Pdf",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS Type Pdf": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code JS limpieza",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS limpieza": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
             "type": "main",
             "index": 0
           }
@@ -271,28 +342,6 @@
           }
         ]
       ]
-    },
-    "Pinecone Vector Store": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript": {
-      "main": [
-        [
-          {
-            "node": "Pinecone Vector Store",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
   },
   "active": false,
@@ -301,12 +350,11 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "1785e5c9-484a-4bf9-88fe-d14d4864a4fa",
+  "versionId": "f168cff2-9794-4a36-8f5f-a8b68d628fd7",
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "964d10f68004bc72323e7156e4be9395db4db6821c043b67f0e2d34d0e1a656f"
   },
   "nodeGroups": [],
-  "id": "evYZc2VzmYMOUi9f",
+  "id": "10LcSgUXRr9RjyBP",
   "tags": []
 }

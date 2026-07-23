@@ -25,7 +25,6 @@
 - [Evidencia del despliegue](#-evidencia-del-despliegue)
 - [Estructura del repositorio](#-estructura-del-repositorio)
 - [Decisiones de arquitectura](#-decisiones-de-arquitectura)
-- [Trabajo futuro](#-trabajo-futuro)
 - [Historial de desarrollo](#-historial-de-desarrollo)
 
 ---
@@ -34,7 +33,7 @@
 
 **BimBam Buy** es un e-commerce multiplataforma (ficticio) enfocado en la experiencia de compra digital ágil y segura, con políticas robustas de reembolso, un programa de afiliados dinámico y una infraestructura logística optimizada para entregas rápidas y soporte constante al usuario final.
 
-Este proyecto implementa un **agente conversacional de IA** que responde preguntas de los usuarios/clientes de BimBam Buy basándose exclusivamente en su documentación oficial (políticas, garantías, medios de pago, envíos, afiliados, contacto y soporte), utilizando **RAG (Retrieval-Augmented Generation)**: el agente primero busca los fragmentos relevantes de la documentación real y luego genera una respuesta fundamentada en esa información, evitando alucinaciones o respuestas inventadas. Simula una aplicación en entorno real de producción para una empresa.
+Este proyecto implementa un **agente conversacional de IA** que responde preguntas de los usuarios/clientes de BimBam Buy basándose exclusivamente en su documentación oficial (políticas, garantías, medios de pago, envíos, afiliados, contacto y soporte), utilizando **RAG (Retrieval-Augmented Generation)**: el agente primero busca los fragmentos relevantes de la documentación real y luego genera una respuesta fundamentada en esa información, evitando alucinaciones o respuestas inventadas. Simula una aplicación en entorno real de producción para una empresa, incluyendo un ciclo completo de gestión de su base de conocimiento (carga, incorporación y eliminación de documentos).
 
 **Problema que resuelve:** reduce el tiempo de respuesta a consultas frecuentes de soporte al cliente (reembolsos, envíos, garantías, medios de pago, afiliados, contacto), permitiendo respuestas inmediatas y consistentes basadas en la documentación oficial vigente, sin depender de un agente humano disponible en todo momento.
 
@@ -50,7 +49,7 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 | README con descripción, arquitectura, tecnologías, código fuente, instrucciones de instalación y ejecución, ejemplos de preguntas/respuestas | ✅ Completo |
 | Evidencia del deploy (capturas/video) dentro del README | ✅ Completo |
 | Historial de commits | ✅ En curso, ver [Historial de desarrollo](#-historial-de-desarrollo) |
-| Deploy disponible mediante URL pública | ✅ **Completo** — Chat Trigger publicado y verificado |
+| Deploy disponible mediante URL pública | ✅ Completo — Chat Trigger publicado y verificado |
 
 ---
 
@@ -92,16 +91,18 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
         └──────────────────────────────────────────────────┘
                                           │
                                           ▼
-                ┌───────────────────────┴───────────────────────┐
-                ▼                                                ▼
-  ┌─────────────────────────────┐         ┌────────────────────────────────┐
-  │  Carga inicial (masiva)        │         │  Carga de documento nuevo         │
-  │  HTTP Request → Code (fix       │         │  (individual)                     │
-  │  mimeType) → Pinecone Vector    │         │  HTTP Request → Code (fix mime) → │
-  │  Store (Insert), en loop         │         │  Extract from File → Code (limpia │
-  │  sobre los 5 PDFs base           │         │  <br>/\n) → Pinecone Vector Store │
-  └─────────────────────────────┘         │  (Insert)                          │
-                                            └────────────────────────────────┘
+      ┌───────────────────────┬──────────┴──────────┬───────────────────────┐
+      ▼                       ▼                      ▼
+┌──────────────┐   ┌──────────────────────┐   ┌──────────────────────┐
+│ Carga masiva     │   │ Carga individual        │   │ Eliminación             │
+│ carga-            │   │ cargar-documento-        │   │ eliminar-               │
+│ documentos.json   │   │ nuevo.json                │   │ documento.json           │
+│                    │   │                            │   │                           │
+│ HTTP → Code (mime) │   │ HTTP → Code (mime) →       │   │ Vector dummy → Query      │
+│ → Pinecone Insert, │   │ Extract from File →        │   │ Pinecone (doc_id) →       │
+│ en loop            │   │ Code (limpia <br>/\n) →    │   │ HTTP Delete (API          │
+│                    │   │ Pinecone Insert            │   │ Pinecone, Header Auth)    │
+└──────────────┘   └──────────────────────┘   └──────────────────────┘
 ```
 
 **Flujo de consulta (usuario final):**
@@ -113,9 +114,10 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 6. Los fragmentos recuperados + la pregunta se envían a **Ollama Cloud** (temperatura 0.3, para minimizar alucinaciones), que genera la respuesta final.
 7. La respuesta se muestra al usuario en la misma ventana de chat.
 
-**Flujos de carga de documentos (administrador, proceso aparte, no público):**
-- **Carga inicial masiva** (`carga-documentos.json`): recorre en loop varios PDFs, descarga, corrige mime type, fragmenta, vectoriza e inserta en Pinecone. ✅ Verificado: 124 fragmentos insertados (5 documentos base).
+**Flujos de gestión de documentos (administrador, proceso aparte, no público):**
+- **Carga inicial masiva** (`carga-documentos.json`): recorre en loop varios PDFs, descarga, corrige mime type, limpia el texto, fragmenta, vectoriza e inserta en Pinecone. ✅ Verificado: 124 fragmentos insertados (5 documentos base).
 - **Carga de documento nuevo** (`cargar-documento-nuevo.json`): agrega un único documento adicional a la base de conocimiento sin afectar los existentes — usado para incorporar `contacto-soporte.pdf`. ✅ Verificado y funcional.
+- **Eliminación de documento** (`eliminar-documento.json`): consulta y borra todos los fragmentos de un `doc_id` específico en Pinecone vía la API REST (con autenticación Header Auth), como paso previo a una recarga o para retirar un documento definitivamente. ✅ Verificado y funcional.
 
 ---
 
@@ -126,7 +128,7 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 | **n8n Cloud** | Orquestador del agente: workflows visuales, Chat Trigger (interfaz + URL pública), AI Agent | Free trial / plan básico |
 | **Ollama Cloud** (`gpt-oss:20b`) | Modelo de lenguaje (LLM) vía API — genera respuestas (temperatura 0.3) y clasifica preguntas | Gratis (con límites de uso) |
 | **Cohere** (`embed-multilingual-v3.0`) | Genera los embeddings (vectores) tanto de los documentos como de las preguntas del usuario | Gratis (con límites de uso) |
-| **Pinecone** | Vector Store — almacena y busca los fragmentos de documentación por similitud semántica, con soporte de metadata | Gratis (plan Starter) |
+| **Pinecone** | Vector Store — almacena, busca y elimina (vía API REST) los fragmentos de documentación por similitud semántica y metadata | Gratis (plan Starter) |
 | **Redis Cloud** | Memoria de conversación persistente, con expiración automática por inactividad (TTL) | Gratis (plan de 30 MB) |
 
 ---
@@ -135,8 +137,9 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 
 | Archivo | Qué contiene | Formato |
 |---|---|---|
-| [`workflows/carga-documentos.json`](./workflows/carga-documentos.json) | Workflow de carga inicial: recorre los 5 PDFs base de BimBam Buy, corrige su mime type, los vectoriza e inserta en Pinecone con metadata. Verificado: 124 fragmentos insertados. | JSON (exportado de n8n) |
+| [`workflows/carga-documentos.json`](./workflows/carga-documentos.json) | Workflow de carga inicial: recorre los 5 PDFs base de BimBam Buy, corrige mime type, limpia el texto, vectoriza e inserta en Pinecone con metadata. Verificado: 124 fragmentos insertados. | JSON (exportado de n8n) |
 | [`workflows/cargar-documento-nuevo.json`](./workflows/cargar-documento-nuevo.json) | Workflow para agregar **un documento nuevo** individual a la base de conocimiento (extrae texto, limpia `<br>`/`\n`, fragmenta, vectoriza e inserta). Usado para incorporar `contacto-soporte.pdf`. | JSON (exportado de n8n) |
+| [`workflows/eliminar-documento.json`](./workflows/eliminar-documento.json) | Workflow que elimina todos los fragmentos de un `doc_id` específico en Pinecone, vía la API REST de Pinecone. | JSON (exportado de n8n) |
 | [`workflows/agente-rag.json`](./workflows/agente-rag.json) | Workflow principal: Chat Trigger (publicado, URL pública), guardrail (Chat Memory Manager + Basic LLM Chain + IF), AI Agent con Ollama, Redis Chat Memory y 6 Tools de Pinecone. Probado con 7 casos reales + prueba en producción vía URL pública. | JSON (exportado de n8n) |
 | [`docs/documentacion-empresa/`](./docs/documentacion-empresa) | Los 6 PDFs oficiales de BimBam Buy usados como base de conocimiento | PDF |
 
@@ -182,7 +185,8 @@ Esta sección permite que **cualquier persona, sin conocer el proyecto previamen
 3. **Crear cuenta en n8n Cloud** y configurar las credenciales:
    - *Ollama*: Base URL `https://ollama.com` + API Key.
    - *Cohere*: API Key.
-   - *Pinecone*: API Key.
+   - *Pinecone*: API Key (credencial tipo Pinecone API para los workflows de carga y el agente).
+   - *Pinecone API Key (Header)*: credencial tipo **Header Auth**, con la misma API Key de Pinecone, usada específicamente por los nodos HTTP Request del workflow `eliminar-documento.json`.
    - *Redis*: host, puerto, password (SSL deshabilitado según la configuración de este proyecto).
 
 4. **Clonar/consultar este repositorio** para obtener los workflows y documentos:
@@ -193,6 +197,7 @@ Esta sección permite que **cualquier persona, sin conocer el proyecto previamen
 5. **Importar los workflows en n8n** (`Workflows → Import from File`):
    - `workflows/carga-documentos.json`
    - `workflows/cargar-documento-nuevo.json`
+   - `workflows/eliminar-documento.json`
    - `workflows/agente-rag.json`
 
 6. **Cargar la base de conocimiento**:
@@ -222,7 +227,8 @@ Esta sección explica cómo **usar** el proyecto ya instalado y desplegado — a
 ### Para el administrador (mantener la base de conocimiento)
 - **Cargar documentos base por primera vez o en batch**: ejecutar manualmente `carga-documentos.json`.
 - **Agregar un documento nuevo individual**: ejecutar manualmente `cargar-documento-nuevo.json`, editando previamente el nodo "Datos del Documento Nuevo" con la `url`, `doc_id` y `categoria` correspondientes.
-- **Actualizar un documento ya existente**: funcionalidad planeada, ver [Trabajo futuro](#-trabajo-futuro).
+- **Eliminar un documento**: abrir `eliminar-documento.json`, en el nodo de tipo Code descomentar la línea con el `doc_id` a eliminar (dejando las demás comentadas) y ejecutar — consulta si existen vectores con ese `doc_id`, y si los hay, los elimina y confirma la cantidad borrada; si no hay ninguno, informa que no había nada que eliminar.
+- **Actualizar un documento existente**: ejecutar `eliminar-documento.json` (borra los fragmentos obsoletos) y luego `cargar-documento-nuevo.json` (inserta la versión actualizada) — o `carga-documentos.json` en modo batch si se actualizan varios documentos a la vez.
 - **Monitorear ejecuciones**: en n8n, pestaña "Executions" de cada workflow, para verificar que terminen sin errores.
 
 ---
@@ -259,13 +265,28 @@ return $input.all();
 
 ### 4. El nodo Pinecone Vector Store de n8n no soporta borrar por metadata
 
-**Hallazgo:** el nodo visual **Pinecone Vector Store** de n8n no expone una operación de borrado por filtro de metadata — es una limitación reportada por la comunidad de n8n desde 2024, aún sin resolver de forma nativa. Pinecone como servicio sí soporta este borrado vía su API REST, pero el nodo de n8n no lo implementa en su interfaz visual.
+**Problema:** el nodo visual **Pinecone Vector Store** de n8n no expone una operación de borrado por filtro de metadata — es una limitación reportada por la comunidad de n8n desde 2024, aún sin resolver de forma nativa.
 
-**Implicancia:** el borrado de fragmentos por `doc_id` requerirá un nodo **HTTP Request** llamando directamente al endpoint de borrado de la API de Pinecone. Ver diseño planeado en [Trabajo futuro](#-trabajo-futuro).
+**Solución:** se construyó el workflow **`eliminar-documento.json`** usando **nodos HTTP Request** que llaman directamente a la API REST de Pinecone, autenticados con una credencial dedicada de tipo **Header Auth** ("Pinecone API Key (Header)"):
+1. Se genera un vector "dummy" y se hace una consulta (`query`) a Pinecone filtrando por `doc_id`, obteniendo los IDs de todos los fragmentos que pertenecen a ese documento.
+2. Si no se encuentran IDs, el workflow informa que no había nada que eliminar y termina ahí.
+3. Si se encuentran IDs, se llama al endpoint de borrado (`delete`) de Pinecone con esa lista, y se confirma la cantidad de fragmentos eliminados.
 
-### 5. Limpieza de formato antes de vectorizar (mejora aplicada en `cargar-documento-nuevo.json`)
+El `doc_id` a eliminar se define en un nodo **Code (JavaScript)** con la lista completa de documentos disponibles como líneas comentadas — se descomenta únicamente el que se quiere eliminar. Se prefirió este enfoque sobre un nodo Edit Fields en modo JSON porque JSON no admite comentarios, dificultando mantener visible el catálogo de `doc_id` disponibles sin tener que recordarlos de memoria:
+```javascript
+// Documentos disponibles para eliminar — descomenta SOLO el que necesites:
+// const doc_id = "politica-reembolsos-devoluciones";
+// const doc_id = "programa-afiliados";
+// const doc_id = "guia-tiempos-costos-envio";
+// const doc_id = "faq-metodos-pago";
+// const doc_id = "manual-garantia-productos";
+const doc_id = "contacto-soporte";
+return [{ json: { doc_id } }];
+```
 
-**Mejora:** a diferencia de `carga-documentos.json` (que deja que el Default Data Loader extraiga el texto directamente del PDF), el workflow `cargar-documento-nuevo.json` usa un nodo **Extract from File** (operación PDF) para obtener el texto de forma explícita, seguido de un nodo **Code** que limpia artefactos de formato antes de vectorizar:
+### 5. Limpieza de formato antes de vectorizar
+
+**Mejora:** los workflows `carga-documentos.json` y `cargar-documento-nuevo.json` extraen el texto de cada PDF con un nodo **Extract from File** (operación PDF) de forma explícita, seguido de un nodo **Code** que limpia artefactos de formato antes de vectorizar:
 ```javascript
 for (const item of $input.all()) {
   let text = item.json.text || '';
@@ -336,6 +357,18 @@ https://github.com/jorgegomezpacheco/agente-ia-rag/raw/main/screenshots/demo-car
 
 ![Carga de documento nuevo exitosa en n8n](./screenshots/cargar-documento-nuevo.png)
 
+### Eliminación de documento
+
+| Evidencia | Estado |
+|---|---|
+| Workflow `eliminar-documento.json` ejecutado con éxito | ✅ |
+
+![Eliminación de documento exitosa en n8n](./screenshots/eliminar-documento.png)
+
+**Video demostrativo (eliminación de documento funcionando):**
+
+https://github.com/jorgegomezpacheco/agente-ia-rag/raw/main/screenshots/demo-eliminar-documento.mp4
+
 ### Agente RAG en funcionamiento (6 categorías probadas, editor de n8n)
 
 Cada captura muestra la ejecución real del workflow `agente-rag.json` en n8n, con la Tool de Pinecone activada y la respuesta generada por el agente:
@@ -369,7 +402,8 @@ agente-ia-rag/
 ├── workflows/
 │   ├── agente-rag.json                # Workflow principal del agente — publicado y probado
 │   ├── carga-documentos.json          # Workflow de carga inicial (5 PDFs base) — verificado
-│   └── cargar-documento-nuevo.json    # Workflow para agregar un documento nuevo — verificado
+│   ├── cargar-documento-nuevo.json    # Workflow para agregar un documento nuevo — verificado
+│   └── eliminar-documento.json        # Workflow para eliminar un documento por doc_id — verificado
 ├── docs/
 │   └── documentacion-empresa/         # 6 PDFs oficiales de BimBam Buy
 ├── screenshots/                       # Evidencia visual y videos del proyecto funcionando
@@ -394,23 +428,7 @@ agente-ia-rag/
 
 **Redis Chat Memory con TTL:** se eligió Redis (en vez de Simple Memory) para la memoria del AI Agent porque soporta expiración automática por inactividad (Session TTL de 40 minutos), liberando recursos de sesiones abandonadas sin intervención manual — un comportamiento estándar en sistemas de chat de producción.
 
-**Workflows de gestión de documentos modulares y de responsabilidad única:** en vez de un único workflow "todo en uno" para cargar, actualizar y eliminar documentos, se optó por piezas independientes y reutilizables: `carga-documentos.json` (batch), `cargar-documento-nuevo.json` (inserción individual) y, próximamente, `eliminar-documento.json` (borrado por `doc_id`). Esta separación permite combinar los workflows según la necesidad — por ejemplo, ejecutar `eliminar-documento.json` seguido de `cargar-documento-nuevo.json` para actualizar un documento existente, o de `carga-documentos.json` si se necesita recargar varios a la vez — en vez de mantener un único workflow monolítico con lógica condicional interna.
-
----
-
-## 🔮 Trabajo futuro
-
-**Workflow `eliminar-documento.json`** — diseñado pero pendiente de implementación. No es un requisito explícito del challenge, se plantea como mejora de robustez para completar el ciclo de gestión de la base de conocimiento.
-
-Diseño planeado:
-1. **Trigger manual** (administrador), con el campo `doc_id` del documento cuyos fragmentos se desean eliminar.
-2. **Nodo HTTP Request** llamando directamente al endpoint de borrado de la API de Pinecone (`DELETE` con filtro por `doc_id` en el body), ya que el nodo visual de n8n no soporta esta operación de forma nativa (ver [Notas técnicas #4](#-notas-técnicas-y-soluciones-a-problemas-encontrados)).
-
-**Este workflow se combinaría con los ya existentes según la necesidad**, sin requerir lógica adicional:
-- **Actualizar un documento existente:** ejecutar `eliminar-documento.json` (borra los fragmentos obsoletos) y luego `cargar-documento-nuevo.json` (inserta la versión actualizada, reutilizando la mejora de limpieza de texto con Extract from File + Code ya implementada).
-- **Actualizar o recargar varios documentos a la vez:** ejecutar `eliminar-documento.json` para cada `doc_id` afectado y luego `carga-documentos.json` en modo batch.
-
-Con este diseño modular, se completaría el ciclo de gestión de la base de conocimiento (carga masiva, incorporación individual y eliminación) sin necesidad de un workflow combinado único.
+**Workflows de gestión de documentos modulares y de responsabilidad única:** en vez de un único workflow "todo en uno" para cargar, actualizar y eliminar documentos, se construyeron piezas independientes y reutilizables: `carga-documentos.json` (batch), `cargar-documento-nuevo.json` (inserción individual) y `eliminar-documento.json` (borrado por `doc_id`, vía API REST de Pinecone con Header Auth). Esta separación permite combinar los workflows según la necesidad — por ejemplo, ejecutar `eliminar-documento.json` seguido de `cargar-documento-nuevo.json` para actualizar un documento existente, o de `carga-documentos.json` si se necesita recargar varios a la vez — en vez de mantener un único workflow monolítico con lógica condicional interna. El `doc_id` a eliminar se selecciona mediante un nodo Code con la lista de documentos disponibles como comentarios, en vez de un campo JSON editable, para mantener visible el catálogo completo sin depender de la memoria del administrador.
 
 ---
 
@@ -434,10 +452,11 @@ Con este diseño modular, se completaría el ciclo de gestión de la base de con
 - [x] Evidencia visual completa (capturas por categoría + videos de ambos workflows)
 - [x] Construcción de `cargar-documento-nuevo.json` e incorporación de `contacto-soporte.pdf`
 - [x] Agregado del sexto Tool `buscar_contacto_soporte` al AI Agent — probado y funcional
-- [x] **Publicación del Chat Trigger con URL pública — verificado en producción**
+- [x] Publicación del Chat Trigger con URL pública — verificado en producción
 - [x] Evidencia del chat público (capturas de bienvenida, respuesta real, y video)
-- [ ] Workflow `eliminar-documento.json` para completar el ciclo de gestión de documentos (ver Trabajo futuro)
-- [ ] Documentación final del README
+- [x] Mejora de limpieza de texto aplicada también a `carga-documentos.json`
+- [x] Construcción de `eliminar-documento.json` (borrado por `doc_id` vía API REST de Pinecone) — probado y funcional
+- [x] Documentación final del README
 
 ---
 

@@ -1,0 +1,304 @@
+{
+  "name": "Eliminar Documento - BimBam Buy",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1296,
+        96
+      ],
+      "id": "66f95b90-a79b-4ddb-94e1-56bffca64941",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vector 'dummy' de ceros, dimensión 1024 (embed-multilingual-v3.0 de Cohere)\n// Se usa solo para poder ejecutar una query con filtro por metadata.\nconst item = $input.first().json;\nitem.zeroVector = Array(1024).fill(0);\nreturn [{ json: item }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        96
+      ],
+      "id": "91a45866-3184-4773-898e-9da219247a72",
+      "name": "Generar Vector Cero"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://agente-ia-rag-f5wwsxd.svc.aped-4627-b74a.pinecone.io/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ vector: $json.zeroVector, filter: { doc_id: { \"$eq\": $json.doc_id } }, topK: 1000, includeValues: false, includeMetadata: false }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -624,
+        96
+      ],
+      "id": "e1f88476-7992-4ee5-86bd-1cbf0d0d153b",
+      "name": "Consultar Vectores Existentes",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "L0ixqSzJGGQR4iy5",
+          "name": "Pinecone API Key (Header)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst matches = response.matches || [];\nconst ids = matches.map(m => m.id);\nreturn [{ json: {\n  doc_id: $('Documento a Eliminar').first().json.doc_id,\n  ids,\n  idsCount: ids.length\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        96
+      ],
+      "id": "e2df642f-7bd1-48a3-a083-4a35f3fe7b8c",
+      "name": "Extraer IDs Encontrados"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.idsCount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "id": "70b9105c-6412-4bfd-bab6-8ef461bb54f4"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -208,
+        96
+      ],
+      "id": "92563ec6-548f-4092-9286-a4f067331c1e",
+      "name": "Existen Vectores?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://agente-ia-rag-f5wwsxd.svc.aped-4627-b74a.pinecone.io/vectors/delete",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ids: $json.ids }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e574718b-155c-46f6-9d82-f29a730d7af8",
+      "name": "Eliminar Vectores",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "L0ixqSzJGGQR4iy5",
+          "name": "Pinecone API Key (Header)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const idsCount = $json.idsCount;\nconst docId = $json.doc_id;\nif (idsCount > 0) {\n  return [{ json: { mensaje: `Se eliminaron ${idsCount} vectores del documento '${docId}'.`, doc_id: docId, eliminados: idsCount } }];\n}\nreturn [{ json: { mensaje: `No se encontraron vectores para el documento '${docId}'. No había nada que eliminar.`, doc_id: docId, eliminados: 0 } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        192
+      ],
+      "id": "a0284d57-c04c-4626-98ba-57a600210464",
+      "name": "Resultado Sin Vectores"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { mensaje: `Se eliminaron ${$json.idsCount || $('Extraer IDs Encontrados').first().json.idsCount} vectores del documento '${$('Documento a Eliminar').first().json.doc_id}' correctamente.`, doc_id: $('Documento a Eliminar').first().json.doc_id, eliminados: $('Extraer IDs Encontrados').first().json.idsCount } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "9fb5b0d8-0fdd-4988-aaaf-53be17a67c29",
+      "name": "Confirmar Eliminación"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n \"doc_id\": \"politica-reembolsos-devoluciones\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1440,
+        -48
+      ],
+      "id": "06fa884b-2926-43d8-b4ee-eba56b5b52e0",
+      "name": "Documento a Eliminar anterior",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Documentos disponibles para eliminar — descomenta SOLO el que necesites:\n//const doc_id = \"politica-reembolsos-devoluciones\";\n// const doc_id = \"programa-afiliados\";\n// const doc_id = \"guia-tiempos-costos-envio\";\n// const doc_id = \"faq-metodos-pago\";\n// const doc_id = \"manual-garantia-productos\";\nconst doc_id = \"contacto-soporte\";\n\nreturn [{ json: { doc_id } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1040,
+        96
+      ],
+      "id": "83de7e9a-07c1-4d5c-8687-59cd6e17dc31",
+      "name": "Documento a Eliminar"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Documento a Eliminar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar Vector Cero": {
+      "main": [
+        [
+          {
+            "node": "Consultar Vectores Existentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Vectores Existentes": {
+      "main": [
+        [
+          {
+            "node": "Extraer IDs Encontrados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer IDs Encontrados": {
+      "main": [
+        [
+          {
+            "node": "Existen Vectores?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existen Vectores?": {
+      "main": [
+        [
+          {
+            "node": "Eliminar Vectores",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado Sin Vectores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eliminar Vectores": {
+      "main": [
+        [
+          {
+            "node": "Confirmar Eliminación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Documento a Eliminar anterior": {
+      "main": [
+        []
+      ]
+    },
+    "Documento a Eliminar": {
+      "main": [
+        [
+          {
+            "node": "Generar Vector Cero",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "858300fb-c51e-454f-9a63-7e06599cb507",
+  "meta": {
+    "instanceId": "964d10f68004bc72323e7156e4be9395db4db6821c043b67f0e2d34d0e1a656f"
+  },
+  "nodeGroups": [],
+  "id": "PO0lfeN4tBR2L9O6",
+  "tags": []
+}
