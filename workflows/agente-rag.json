@@ -3,7 +3,12 @@
   "nodes": [
     {
       "parameters": {
-        "options": {}
+        "public": true,
+        "initialMessages": "Puedo ayudarte con consultas sobre:\n💰 Reembolsos y devoluciones\n🚚 Envíos y tiempos de entrega\n💳 Métodos de pago\n🛡️ Garantía de productos\n🤝 Programa de afiliados\n💬 Contacto y soporte\n\n¿En qué puedo ayudarte hoy?",
+        "options": {
+          "subtitle": "=¡Hola! 👋 Soy el asistente virtual.\n\nEstamos para ayudarte las 24 horas.",
+          "title": "BimBam Buy 👋"
+        }
       },
       "type": "@n8n/n8n-nodes-langchain.chatTrigger",
       "typeVersion": 1.4,
@@ -18,7 +23,7 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Historial reciente de la conversación (puede estar vacío si es la primera pregunta): {{ $json.messages.map(m => (m.human ? 'Usuario: ' + m.human + '\\n' : '') + (m.ai ? 'Asistente: ' + (typeof m.ai === 'string' ? m.ai : JSON.stringify(m.ai)) : '')).join('\\n') }}\n\nPregunta actual del usuario: {{ $('When chat message received').item.json.chatInput }}\n\nAnaliza si la PREGUNTA ACTUAL, considerando el historial reciente si aporta contexto,\nestá relacionada con alguno de estos 5 temas de BimBam Buy: reembolsos y devoluciones,\nprograma de afiliados, envíos, métodos de pago, o garantías de productos.\n\nImportante: si la pregunta actual es sobre un tema completamente distinto\n(por ejemplo deportes, clima, cultura general), responde \"NO\" aunque el\nhistorial reciente sea sobre BimBam Buy — no asumas que toda la sesión\ncompleta es válida solo porque empezó siendo relevante.\n\nResponde ÚNICAMENTE con la palabra \"SI\" o \"NO\", sin explicación adicional.\n",
+        "text": "=Historial reciente de la conversación (puede estar vacío si es la primera pregunta): {{ $json.messages.map(m => (m.human ? 'Usuario: ' + m.human + '\\n' : '') + (m.ai ? 'Asistente: ' + (typeof m.ai === 'string' ? m.ai : JSON.stringify(m.ai)) : '')).join('\\n') }}\n\nPregunta actual del usuario: {{ $('When chat message received').item.json.chatInput }}\n\nAnaliza si la PREGUNTA ACTUAL, considerando el historial reciente si aporta contexto,\nestá relacionada con alguno de estos 6 temas de BimBam Buy: reembolsos y devoluciones,\nprograma de afiliados, envíos, métodos de pago, garantías de productos, o contacto y\nayuda al cliente o soporte (canales de atención, cómo reportar una incidencia, o cómo comunicarse\ncon la empresa).\n\nImportante: si la pregunta actual es sobre un tema completamente distinto\n(por ejemplo deportes, clima, cultura general), responde \"NO\" aunque el\nhistorial reciente sea sobre BimBam Buy — no asumas que toda la sesión\ncompleta es válida solo porque empezó siendo relevante.\n\nResponde ÚNICAMENTE con la palabra \"SI\" o \"NO\", sin explicación adicional.\n\n",
         "messages": {
           "messageValues": []
         },
@@ -91,7 +96,7 @@
         "promptType": "define",
         "text": "={{ $('When chat message received').item.json.chatInput }}",
         "options": {
-          "systemMessage": "Eres el asistente virtual oficial de BimBam Buy, un e-commerce\nmultiplataforma. Tu única función es responder preguntas de clientes\nusando EXCLUSIVAMENTE la información que obtengas de tus herramientas\n(reembolsos, afiliados, envíos, pagos, garantías).\n\nReglas estrictas:\n- Nunca inventes información que no esté en los resultados de tus herramientas.\n- Si no encuentras información relevante en ninguna herramienta, indica\n  que no cuentas con esa información y sugiere contactar a soporte humano.\n- Sé claro, breve y amable en tus respuestas.\n- Si la pregunta abarca más de un tema, usa varias herramientas si es necesario.\n\nFormato de tus respuestas:\n- Usa Markdown estándar (negritas con **texto**, listas con guiones -).\n- NO uses etiquetas HTML como <br>.\n- NO utilices etiquetas  como <br> en tus respuestas al usuario/cliente.\n- NO escribas el texto \"\\n\" literalmente; usa saltos de línea reales.\n- Mantén las respuestas organizadas pero conversacionales, no como tablas complejas."
+          "systemMessage": "Eres el asistente virtual oficial de BimBam Buy, un e-commerce\nmultiplataforma. Tu única función es responder preguntas de clientes\nusando EXCLUSIVAMENTE la información que obtengas de tus herramientas\n(reembolsos, afiliados, envíos, pagos, garantías, contacto y soporte).\n\nReglas estrictas:\n- Nunca inventes información que no esté en los resultados de tus herramientas.\n- Si la pregunta trata sobre cómo contactar a soporte, canales de atención o cómo reportar una incidencia, usa la herramienta de contacto y soporte para responder con datos reales, en vez de sugerir \"contactar a soporte humano\" de forma genérica.\n- Si no encuentras información relevante en ninguna herramienta después de intentarlo, indica claramente que no cuentas con esa información específica y usa la herramienta de contacto y soporte para orientar al usuario sobre cómo comunicarse con BimBam Buy.\n- Sé claro, breve y amable en tus respuestas.\n- Si la pregunta abarca más de un tema, usa varias herramientas si es necesario.\n\nFormato de tus respuestas:\n- Usa Markdown estándar (negritas con **texto**, listas con guiones -).\n- NO uses etiquetas HTML como <br>.\n- NO utilices etiquetas  como <br> en tus respuestas al usuario/cliente.\n- NO escribas el texto \"\\n\" literalmente; usa saltos de línea reales.\n- Si el contenido recuperado de tus herramientas contiene literalmente la secuencia \"<br>\", NO la copies tal cual: reemplázala mentalmente por un salto de línea antes de redactar tu respuesta final.\n- Mantén las respuestas organizadas pero conversacionales, no como tablas complejas."
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -154,8 +159,8 @@
       "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
       "typeVersion": 1,
       "position": [
-        1120,
-        -2928
+        992,
+        -2976
       ],
       "id": "5532f274-8905-44e2-8bbe-415977e13182",
       "name": "Embeddings Cohere",
@@ -190,8 +195,8 @@
       "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
       "typeVersion": 1.3,
       "position": [
-        976,
-        -3072
+        864,
+        -3104
       ],
       "id": "54530f5f-d187-487b-aec6-f4390ce69db0",
       "name": "buscar_reembolsos",
@@ -209,8 +214,8 @@
       "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
       "typeVersion": 1,
       "position": [
-        800,
-        -2880
+        752,
+        -2912
       ],
       "id": "635feea4-ba59-4392-9624-38d0bed0a922",
       "name": "Embeddings Cohere1",
@@ -245,8 +250,8 @@
       "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
       "typeVersion": 1.3,
       "position": [
-        656,
-        -3024
+        624,
+        -3040
       ],
       "id": "ba4d985d-079f-4682-aa8e-dafc8d894d10",
       "name": "buscar_afiliados",
@@ -265,7 +270,7 @@
       "typeVersion": 1,
       "position": [
         496,
-        -2864
+        -2896
       ],
       "id": "d8a0bd11-e620-4de2-a748-908eb80ff5d2",
       "name": "Embeddings Cohere2",
@@ -300,8 +305,8 @@
       "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
       "typeVersion": 1.3,
       "position": [
-        368,
-        -2992
+        352,
+        -3024
       ],
       "id": "d7d503ff-88e2-42e6-badb-103e932ad996",
       "name": "buscar_envios",
@@ -319,8 +324,8 @@
       "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
       "typeVersion": 1,
       "position": [
-        240,
-        -2848
+        208,
+        -2864
       ],
       "id": "c7e48fff-5be9-48b9-9725-735ba82e88de",
       "name": "Embeddings Cohere3",
@@ -356,7 +361,7 @@
       "typeVersion": 1.3,
       "position": [
         80,
-        -2976
+        -2992
       ],
       "id": "c7072b80-df44-45f4-a0bb-f3e6ef361a30",
       "name": "buscar_pagos",
@@ -374,8 +379,8 @@
       "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
       "typeVersion": 1,
       "position": [
-        -32,
-        -2832
+        -64,
+        -2848
       ],
       "id": "c462894b-931b-445d-8fed-9eb0784605c6",
       "name": "Embeddings Cohere4",
@@ -411,7 +416,7 @@
       "typeVersion": 1.3,
       "position": [
         -192,
-        -2960
+        -2976
       ],
       "id": "4d9b3caa-6bbe-4117-8213-c88dadc40b09",
       "name": "buscar_garantias",
@@ -477,6 +482,61 @@
         "redis": {
           "id": "Hz1hzC4Hx4mKtB3L",
           "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "embed-multilingual-v3.0"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        -3024
+      ],
+      "id": "21f0faa3-0320-425e-8d40-406bb2013908",
+      "name": "Embeddings Cohere5",
+      "credentials": {
+        "cohereApi": {
+          "id": "bsfRiLt8qj3wFq6L",
+          "name": "Cohere account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Usa esta herramienta cuando el usuario pregunte cómo contactar a soporte, qué canales de atención existen (correo, chat, formulario de postventa, centro de ayuda), cómo reportar una incidencia (falla, daño, extravío, cobro duplicado), o dónde obtener ayuda general con su cuenta o pedido, cuando la consulta no corresponda a reembolsos, garantías, envíos, pagos o afiliados.",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "agente-ia-rag",
+          "mode": "list",
+          "cachedResultName": "agente-ia-rag"
+        },
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "categoria",
+                "value": "contacto-soporte"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        -3152
+      ],
+      "id": "5c6ba573-f4c7-4fa1-b2ca-b52790b9937b",
+      "name": "buscar_contacto_soporte",
+      "credentials": {
+        "pineconeApi": {
+          "id": "YvtstHVW5fOXXNWd",
+          "name": "Pinecone account"
         }
       }
     }
@@ -687,15 +747,37 @@
           }
         ]
       ]
+    },
+    "Embeddings Cohere5": {
+      "ai_embedding": [
+        [
+          {
+            "node": "buscar_contacto_soporte",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_contacto_soporte": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "b272d208-4abf-48e7-8c2f-edd333ab48bf",
+  "versionId": "7c2f8574-9dc5-4f2a-8a6c-7c15a8f144d7",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "964d10f68004bc72323e7156e4be9395db4db6821c043b67f0e2d34d0e1a656f"

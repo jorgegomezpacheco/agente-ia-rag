@@ -2,7 +2,7 @@
 
 > Agente de IA capaz de responder preguntas en lenguaje natural utilizando la documentación oficial de **BimBam Buy** como base de conocimiento, mediante la técnica de RAG (Retrieval-Augmented Generation).
 
-![Estado](https://img.shields.io/badge/estado-en%20desarrollo-yellow)
+![Estado](https://img.shields.io/badge/estado-en%20producción-brightgreen)
 ![n8n](https://img.shields.io/badge/n8n-cloud-orange)
 ![Vector Store](https://img.shields.io/badge/vector%20store-Pinecone-blueviolet)
 ![Embeddings](https://img.shields.io/badge/embeddings-Cohere-purple)
@@ -50,13 +50,13 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 | README con descripción, arquitectura, tecnologías, código fuente, instrucciones de instalación y ejecución, ejemplos de preguntas/respuestas | ✅ Completo |
 | Evidencia del deploy (capturas/video) dentro del README | ✅ Completo |
 | Historial de commits | ✅ En curso, ver [Historial de desarrollo](#-historial-de-desarrollo) |
-| Deploy disponible mediante URL pública | ⏳ Pendiente — falta publicar el Chat Trigger de n8n con "Make Chat Publicly Available" |
+| Deploy disponible mediante URL pública | ✅ **Completo** — Chat Trigger publicado y verificado |
 
 ---
 
 ## 🌐 Demo / URL pública
 
-- **Chat del agente (n8n Cloud):** `[PENDIENTE: URL del Chat Trigger publicado]`
+- **Chat del agente (n8n Cloud):** https://jorgegomezpacheco.app.n8n.cloud/webhook/fb37ceff-460b-42cd-8384-955de7177aea/chat
 - **Instancia de n8n:** https://jorgegomezpacheco.app.n8n.cloud/
 - **Repositorio GitHub:** https://github.com/jorgegomezpacheco/agente-ia-rag
 
@@ -71,7 +71,7 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
         ┌──────────────────────────────────────────────────┐
         │              n8n Cloud (jorgegomezpacheco)          │
         │                                                      │
-        │   Chat Trigger                                       │
+        │   Chat Trigger (URL pública)                          │
         │       │                                               │
         │       ▼                                               │
         │   Chat Memory Manager ──► Redis Chat Memory            │
@@ -114,7 +114,7 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 7. La respuesta se muestra al usuario en la misma ventana de chat.
 
 **Flujos de carga de documentos (administrador, proceso aparte, no público):**
-- **Carga inicial masiva** (`carga-documentos.json`): recorre en loop los 5 PDFs base, descarga, corrige mime type, fragmenta, vectoriza e inserta en Pinecone. ✅ Verificado: 124 fragmentos insertados.
+- **Carga inicial masiva** (`carga-documentos.json`): recorre en loop varios PDFs, descarga, corrige mime type, fragmenta, vectoriza e inserta en Pinecone. ✅ Verificado: 124 fragmentos insertados (5 documentos base).
 - **Carga de documento nuevo** (`cargar-documento-nuevo.json`): agrega un único documento adicional a la base de conocimiento sin afectar los existentes — usado para incorporar `contacto-soporte.pdf`. ✅ Verificado y funcional.
 
 ---
@@ -136,8 +136,8 @@ Este proyecto implementa un **agente conversacional de IA** que responde pregunt
 | Archivo | Qué contiene | Formato |
 |---|---|---|
 | [`workflows/carga-documentos.json`](./workflows/carga-documentos.json) | Workflow de carga inicial: recorre los 5 PDFs base de BimBam Buy, corrige su mime type, los vectoriza e inserta en Pinecone con metadata. Verificado: 124 fragmentos insertados. | JSON (exportado de n8n) |
-| [`workflows/cargar-documento-nuevo.json`](./workflows/cargar-documento-nuevo.json) | Workflow para agregar **un documento nuevo** individual a la base de conocimiento (extrae texto, limpia `<br>`/`\n`, fragmenta, vectoriza e inserta). Usado para incorporar `contacto-soporte.pdf`. No actualiza documentos existentes (ver [Trabajo futuro](#-trabajo-futuro)). | JSON (exportado de n8n) |
-| [`workflows/agente-rag.json`](./workflows/agente-rag.json) | Workflow principal: Chat Trigger, guardrail (Chat Memory Manager + Basic LLM Chain + IF), AI Agent con Ollama, Redis Chat Memory y 6 Tools de Pinecone. Probado con 7 casos reales. | JSON (exportado de n8n) |
+| [`workflows/cargar-documento-nuevo.json`](./workflows/cargar-documento-nuevo.json) | Workflow para agregar **un documento nuevo** individual a la base de conocimiento (extrae texto, limpia `<br>`/`\n`, fragmenta, vectoriza e inserta). Usado para incorporar `contacto-soporte.pdf`. | JSON (exportado de n8n) |
+| [`workflows/agente-rag.json`](./workflows/agente-rag.json) | Workflow principal: Chat Trigger (publicado, URL pública), guardrail (Chat Memory Manager + Basic LLM Chain + IF), AI Agent con Ollama, Redis Chat Memory y 6 Tools de Pinecone. Probado con 7 casos reales + prueba en producción vía URL pública. | JSON (exportado de n8n) |
 | [`docs/documentacion-empresa/`](./docs/documentacion-empresa) | Los 6 PDFs oficiales de BimBam Buy usados como base de conocimiento | PDF |
 
 > 💡 Los workflows de n8n son "código visual": cada nodo equivale a un bloque de lógica, y el archivo `.json` exportado contiene toda esa lógica en formato texto — por lo tanto, es código versionable y revisable, aunque no se escriba línea por línea como Python o JavaScript.
@@ -210,7 +210,7 @@ Con esto, la instalación queda completa y el sistema listo para usarse (ver sec
 Esta sección explica cómo **usar** el proyecto ya instalado y desplegado — a diferencia de la sección anterior, que explica cómo instalarlo desde cero.
 
 ### Para el usuario final (consultar al agente)
-1. Abrir la **Chat URL pública** del agente (ver [Demo / URL pública](#-demo--url-pública)).
+1. Abrir la **Chat URL pública** del agente: https://jorgegomezpacheco.app.n8n.cloud/webhook/fb37ceff-460b-42cd-8384-955de7177aea/chat
 2. Escribir una pregunta en lenguaje natural relacionada con BimBam Buy — por ejemplo:
    - *"¿Cuánto tiempo tarda un reembolso?"*
    - *"¿Cómo me uno al programa de afiliados?"*
@@ -220,9 +220,9 @@ Esta sección explica cómo **usar** el proyecto ya instalado y desplegado — a
 5. Si se pregunta algo fuera del alcance de BimBam Buy, el agente lo indica amablemente y sugiere contactar a soporte humano, sin intentar inventar una respuesta.
 
 ### Para el administrador (mantener la base de conocimiento)
-- **Cargar documentos base por primera vez**: ejecutar manualmente `carga-documentos.json` desde el editor de n8n.
-- **Agregar un documento nuevo**: ejecutar manualmente `cargar-documento-nuevo.json`, editando previamente el nodo "Datos del Documento Nuevo" con la `url`, `doc_id` y `categoria` correspondientes.
-- **Actualizar un documento ya existente**: funcionalidad planeada, ver [Trabajo futuro](#-trabajo-futuro) — el workflow actual solo agrega, no reemplaza.
+- **Cargar documentos base por primera vez o en batch**: ejecutar manualmente `carga-documentos.json`.
+- **Agregar un documento nuevo individual**: ejecutar manualmente `cargar-documento-nuevo.json`, editando previamente el nodo "Datos del Documento Nuevo" con la `url`, `doc_id` y `categoria` correspondientes.
+- **Actualizar un documento ya existente**: funcionalidad planeada, ver [Trabajo futuro](#-trabajo-futuro).
 - **Monitorear ejecuciones**: en n8n, pestaña "Executions" de cada workflow, para verificar que terminen sin errores.
 
 ---
@@ -261,7 +261,7 @@ return $input.all();
 
 **Hallazgo:** el nodo visual **Pinecone Vector Store** de n8n no expone una operación de borrado por filtro de metadata — es una limitación reportada por la comunidad de n8n desde 2024, aún sin resolver de forma nativa. Pinecone como servicio sí soporta este borrado vía su API REST, pero el nodo de n8n no lo implementa en su interfaz visual.
 
-**Implicancia:** el workflow de mantenimiento (actualizar un documento existente con borrado limpio) requiere un nodo **HTTP Request** llamando directamente al endpoint de borrado de la API de Pinecone. Ver diseño planeado en [Trabajo futuro](#-trabajo-futuro).
+**Implicancia:** el borrado de fragmentos por `doc_id` requerirá un nodo **HTTP Request** llamando directamente al endpoint de borrado de la API de Pinecone. Ver diseño planeado en [Trabajo futuro](#-trabajo-futuro).
 
 ### 5. Limpieza de formato antes de vectorizar (mejora aplicada en `cargar-documento-nuevo.json`)
 
@@ -284,7 +284,7 @@ Esto asegura que los fragmentos almacenados en Pinecone no contengan etiquetas H
 
 ## 💬 Ejemplos de preguntas y respuestas
 
-Pruebas reales realizadas sobre el agente en ejecución, cubriendo las 6 categorías y el rechazo de preguntas fuera de alcance:
+Pruebas reales realizadas sobre el agente en ejecución (incluyendo la URL pública en producción), cubriendo las 6 categorías y el rechazo de preguntas fuera de alcance:
 
 | # | Pregunta del usuario | Categoría / Tool | Resumen de la respuesta del agente |
 |---|---|---|---|
@@ -296,13 +296,29 @@ Pruebas reales realizadas sobre el agente en ejecución, cubriendo las 6 categor
 | 6 | ¿Cómo contacto a soporte? | `buscar_contacto_soporte` | Canales disponibles (chat, correo, formulario de post-venta, centro de ayuda), qué incluir en la solicitud (número de orden, correo, descripción, evidencia) y buenas prácticas de contacto. |
 | 7 | ¿Quién ganó el mundial? | *(guardrail — sin Tool)* | *"Lo siento, solo puedo responder preguntas relacionadas con reembolsos, programa de afiliados, envíos, métodos de pago o garantías de productos de BimBam Buy. Para otras consultas, contacta a soporte humano."* — rechazada correctamente sin consumir tokens del AI Agent. |
 
-> ✅ Adicionalmente se verificó que preguntas de seguimiento con referencias implícitas (ej. *"¿y qué pasa si ya pasó ese plazo?"* tras una pregunta sobre reembolsos) son correctamente interpretadas gracias al guardrail con memoria de contexto (Chat Memory Manager + Redis), sin perder continuidad de la conversación.
+> ✅ Adicionalmente se verificó que preguntas de seguimiento con referencias implícitas (ej. *"¿y qué pasa si ya pasó ese plazo?"* tras una pregunta sobre reembolsos) son correctamente interpretadas gracias al guardrail con memoria de contexto (Chat Memory Manager + Redis), sin perder continuidad de la conversación. Todas estas pruebas fueron replicadas exitosamente también desde la **URL pública en producción**.
 
 Capturas de cada ejecución disponibles en la sección de [Evidencia del despliegue](#-evidencia-del-despliegue).
 
 ---
 
 ## 📸 Evidencia del despliegue
+
+### Agente funcionando desde la URL pública (producción)
+
+| Evidencia | Estado |
+|---|---|
+| Chat público accesible y funcional vía URL de producción | ✅ |
+| Pantalla de bienvenida del chat público | ✅ |
+| Respuesta a consulta real desde el chat público | ✅ |
+
+![Pantalla de bienvenida del chat público](./screenshots/bienvenida-agente-chat-publico.png)
+
+![Agente respondiendo en el chat público](./screenshots/agente-chat-publico.png)
+
+**Video demostrativo (agente funcionando vía URL pública):**
+
+https://github.com/jorgegomezpacheco/agente-ia-rag/raw/main/screenshots/demo-chat-publico.mp4
 
 ### Carga de documentos (base de conocimiento)
 
@@ -320,7 +336,7 @@ https://github.com/jorgegomezpacheco/agente-ia-rag/raw/main/screenshots/demo-car
 
 ![Carga de documento nuevo exitosa en n8n](./screenshots/cargar-documento-nuevo.png)
 
-### Agente RAG en funcionamiento (6 categorías probadas)
+### Agente RAG en funcionamiento (6 categorías probadas, editor de n8n)
 
 Cada captura muestra la ejecución real del workflow `agente-rag.json` en n8n, con la Tool de Pinecone activada y la respuesta generada por el agente:
 
@@ -333,7 +349,7 @@ Cada captura muestra la ejecución real del workflow `agente-rag.json` en n8n, c
 | Reembolsos | ![Prueba reembolsos](./screenshots/agente-prueba-reembolsos.png) |
 | Contacto y soporte | ![Prueba contacto y soporte](./screenshots/agente-prueba-contacto-soporte.png) |
 
-**Video demostrativo (Agente RAG completo en funcionamiento):**
+**Video demostrativo (Agente RAG completo en funcionamiento, editor de n8n):**
 
 https://github.com/jorgegomezpacheco/agente-ia-rag/raw/main/screenshots/demo-agente-rag.mp4
 
@@ -343,8 +359,6 @@ https://github.com/jorgegomezpacheco/agente-ia-rag/raw/main/screenshots/demo-con
 
 > Si los videos no se reproducen embebidos directamente en GitHub, descárgalos desde los enlaces de arriba o desde la carpeta [`/screenshots`](./screenshots).
 
-`[PENDIENTE: captura del chat público respondiendo, una vez publicado el Chat Trigger con URL pública]`
-
 ---
 
 ## 📂 Estructura del repositorio
@@ -353,7 +367,7 @@ https://github.com/jorgegomezpacheco/agente-ia-rag/raw/main/screenshots/demo-con
 agente-ia-rag/
 ├── README.md                          # Este archivo
 ├── workflows/
-│   ├── agente-rag.json                # Workflow principal del agente — probado
+│   ├── agente-rag.json                # Workflow principal del agente — publicado y probado
 │   ├── carga-documentos.json          # Workflow de carga inicial (5 PDFs base) — verificado
 │   └── cargar-documento-nuevo.json    # Workflow para agregar un documento nuevo — verificado
 ├── docs/
@@ -380,20 +394,23 @@ agente-ia-rag/
 
 **Redis Chat Memory con TTL:** se eligió Redis (en vez de Simple Memory) para la memoria del AI Agent porque soporta expiración automática por inactividad (Session TTL de 40 minutos), liberando recursos de sesiones abandonadas sin intervención manual — un comportamiento estándar en sistemas de chat de producción.
 
-**Dos workflows de carga separados (masiva vs. individual):** en vez de forzar toda carga de documentos por el flujo en loop de `carga-documentos.json`, se creó un workflow independiente (`cargar-documento-nuevo.json`) para incorporar documentos uno a la vez, con extracción y limpieza de texto explícitas — más simple de ejecutar y auditar para el caso de uso de "agregar un documento nuevo" sin tocar el resto de la base de conocimiento.
+**Workflows de gestión de documentos modulares y de responsabilidad única:** en vez de un único workflow "todo en uno" para cargar, actualizar y eliminar documentos, se optó por piezas independientes y reutilizables: `carga-documentos.json` (batch), `cargar-documento-nuevo.json` (inserción individual) y, próximamente, `eliminar-documento.json` (borrado por `doc_id`). Esta separación permite combinar los workflows según la necesidad — por ejemplo, ejecutar `eliminar-documento.json` seguido de `cargar-documento-nuevo.json` para actualizar un documento existente, o de `carga-documentos.json` si se necesita recargar varios a la vez — en vez de mantener un único workflow monolítico con lógica condicional interna.
 
 ---
 
 ## 🔮 Trabajo futuro
 
-**Actualización de documentos existentes con borrado limpio** — el workflow actual `cargar-documento-nuevo.json` solo **inserta** documentos; si se ejecutara sobre un `doc_id` ya existente, generaría fragmentos duplicados en lugar de reemplazarlos. No es un requisito explícito del challenge, se plantea como mejora de robustez.
+**Workflow `eliminar-documento.json`** — diseñado pero pendiente de implementación. No es un requisito explícito del challenge, se plantea como mejora de robustez para completar el ciclo de gestión de la base de conocimiento.
 
-Diseño planeado para un futuro workflow de actualización:
-1. **Trigger manual** (administrador), con los campos `url`, `doc_id` y `categoria` del documento a actualizar.
+Diseño planeado:
+1. **Trigger manual** (administrador), con el campo `doc_id` del documento cuyos fragmentos se desean eliminar.
 2. **Nodo HTTP Request** llamando directamente al endpoint de borrado de la API de Pinecone (`DELETE` con filtro por `doc_id` en el body), ya que el nodo visual de n8n no soporta esta operación de forma nativa (ver [Notas técnicas #4](#-notas-técnicas-y-soluciones-a-problemas-encontrados)).
-3. **Reutilizar el patrón de extracción y limpieza** ya construido y verificado en `cargar-documento-nuevo.json` para insertar la versión actualizada.
 
-Con este diseño, se completaría el ciclo de gestión de la base de conocimiento: carga inicial masiva, incorporación de documentos nuevos (ya implementado) y actualización de documentos existentes (pendiente).
+**Este workflow se combinaría con los ya existentes según la necesidad**, sin requerir lógica adicional:
+- **Actualizar un documento existente:** ejecutar `eliminar-documento.json` (borra los fragmentos obsoletos) y luego `cargar-documento-nuevo.json` (inserta la versión actualizada, reutilizando la mejora de limpieza de texto con Extract from File + Code ya implementada).
+- **Actualizar o recargar varios documentos a la vez:** ejecutar `eliminar-documento.json` para cada `doc_id` afectado y luego `carga-documentos.json` en modo batch.
+
+Con este diseño modular, se completaría el ciclo de gestión de la base de conocimiento (carga masiva, incorporación individual y eliminación) sin necesidad de un workflow combinado único.
 
 ---
 
@@ -417,8 +434,9 @@ Con este diseño, se completaría el ciclo de gestión de la base de conocimient
 - [x] Evidencia visual completa (capturas por categoría + videos de ambos workflows)
 - [x] Construcción de `cargar-documento-nuevo.json` e incorporación de `contacto-soporte.pdf`
 - [x] Agregado del sexto Tool `buscar_contacto_soporte` al AI Agent — probado y funcional
-- [ ] Publicación del Chat Trigger con URL pública
-- [ ] Workflow de actualización de documentos existentes con borrado limpio (ver Trabajo futuro)
+- [x] **Publicación del Chat Trigger con URL pública — verificado en producción**
+- [x] Evidencia del chat público (capturas de bienvenida, respuesta real, y video)
+- [ ] Workflow `eliminar-documento.json` para completar el ciclo de gestión de documentos (ver Trabajo futuro)
 - [ ] Documentación final del README
 
 ---
